@@ -170,7 +170,7 @@ int main(int argc, char **argv) {
       puts("failed to perform encryption");
       return EXIT_FAILURE;
     }
-    if(write_to_file(output_filename, c, input_size + crypto_box_ZEROBYTES)) {
+    if(write_to_file(output_filename, c + crypto_box_BOXZEROBYTES, input_size + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES)) {
       puts("failed to writed encrypted data");
       return EXIT_FAILURE;
     }
@@ -179,16 +179,16 @@ int main(int argc, char **argv) {
     unsigned char *ciphertext_padded;
     unsigned char *m;
     
-    //ciphertext_padded = calloc(crypto_box_ZEROBYTES + input_size, sizeof(char));
-    //memcpy(ciphertext_padded + crypto_box_ZEROBYTES, input_bytes, input_size);
+    ciphertext_padded = calloc(crypto_box_BOXZEROBYTES + input_size, sizeof(char));
+    memcpy(ciphertext_padded + crypto_box_BOXZEROBYTES, input_bytes, input_size);
     
-    m = calloc(/*crypto_box_ZEROBYTES + */input_size, sizeof(char));
+    m = calloc(crypto_box_BOXZEROBYTES + input_size, sizeof(char));
     
-    if(crypto_box_open(m, input_bytes/*ciphertext_padded*/, /*crypto_box_ZEROBYTES + */input_size, n, pk, sk)) {
+    if(crypto_box_open(m, ciphertext_padded, crypto_box_BOXZEROBYTES + input_size, n, pk, sk)) {
       puts("failed to perform decryption");
       return EXIT_FAILURE;
     }
-    if(write_to_file(output_filename, m/* + crypto_box_ZEROBYTES*/, input_size)) {
+    if(write_to_file(output_filename, m + crypto_box_BOXZEROBYTES, input_size)) {
       puts("failed to writed decrypted data");
       return EXIT_FAILURE;
     }
