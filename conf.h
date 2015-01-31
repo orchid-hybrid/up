@@ -3,7 +3,7 @@
 
 typedef struct line {
   int length;
-  char **words;
+  char **word;
 } line;
 
 typedef struct conf {

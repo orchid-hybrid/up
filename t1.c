@@ -8,7 +8,7 @@
 // This program tests generating a keypair
 // as well as saving to and loading from files
 
-void main(void) {
+int main(void) {
   unsigned char pk[crypto_box_PUBLICKEYBYTES];
   unsigned char sk[crypto_box_SECRETKEYBYTES];
   
@@ -21,4 +21,6 @@ void main(void) {
   write_to_file("secret_key.seckey", sk, crypto_box_SECRETKEYBYTES);
   if(!read_from_file("public_key.pubkey", &pk2, &big)) puts("ok!");
   printf("%d %d\n", big, memcmp(pk, pk2, big));
+
+  return 0;
 }

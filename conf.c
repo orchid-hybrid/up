@@ -64,7 +64,7 @@ conf *load_conf_file(char *filename) {
   c->lines = malloc(c->length*sizeof(line));
   
   for(i = 0; i < lines_len; i++) {
-    split(lines[i], ' ', &c->lines[i].words, &c->lines[i].length);
+    split(lines[i], ' ', &c->lines[i].word, &c->lines[i].length);
   }
   
   return c;

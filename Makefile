@@ -13,7 +13,7 @@ NACL_FLAGS=-I$(NACL)/include -I$(NACL)/include/$(ABI)
 # the libs should come from $(NACL)/bin/oklibs-$(ABI)
 NACL_LIBS=$(NACL)/lib/$(ABI)/libnacl.a $(NACL)/lib/$(ABI)/randombytes.o $(NACL)/lib/$(ABI)/cpucycles.o -lrt -lm
 
-all: t1 t2 t3 t4 t5
+all: t1 t2 t3 t4 t5 t6 keys addressbook.conf
 
 t1: t1.c utilities.o
 	$(CC) $(NACL_FLAGS) t1.c utilities.o $(NACL_LIBS) -o t1
@@ -30,6 +30,27 @@ t4: t4.c utilities.o
 t5: t5.c utilities.o
 	$(CC) $(NACL_FLAGS) t5.c utilities.o $(NACL_LIBS) -o t5
 
+t6: t6.c utilities.o conf.o
+	$(CC) $(NACL_FLAGS) t6.c utilities.o conf.o $(NACL_LIBS) -o t6
+
+keys: t1
+	mkdir keys
+	./t1
+	mv secret_key.seckey keys/alice.seckey
+	mv public_key.pubkey keys/alice.pubkey
+	./t1
+	mv secret_key.seckey keys/bob.seckey
+	mv public_key.pubkey keys/bob.pubkey
+	./t1
+	mv secret_key.seckey keys/eve.seckey
+	mv public_key.pubkey keys/eve.pubkey
+
+addressbook.conf: keys
+	rm -f addressbook.conf
+	echo "alice keys/alice.pubkey keys/alice.seckey" >> addressbook.conf
+	echo "bob keys/bob.pubkey keys/bob.seckey" >> addressbook.conf
+	echo "eve keys/eve.pubkey" >> addressbook.conf
+
 utilities.o: utilities.c
 	$(CC) $(NACL_FLAGS) -c utilities.c -o utilities.o
 
@@ -44,3 +65,6 @@ clean:
 	rm -f t3
 	rm -f t4
 	rm -f t5
+	rm -f t6
+	rm -r keys
+	rm -f addressbook.conf

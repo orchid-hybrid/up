@@ -16,7 +16,7 @@ void main(int argc, char **argv) {
 
   for(i = 0; i < c->length; i++) {
     for(j = 0; j < c->lines[i].length; j++) {
-      printf("<%s>", c->lines[i].words[j]);
+      printf("<%s>", c->lines[i].word[j]);
     }
     printf("\n");
   }
