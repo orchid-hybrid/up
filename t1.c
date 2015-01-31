@@ -17,8 +17,8 @@ void main(void) {
 
   crypto_sign_keypair(pk,sk);
 
-  write_to_file("public_key.bin", pk, crypto_sign_PUBLICKEYBYTES);
-  write_to_file("secret_key.bin", sk, crypto_sign_SECRETKEYBYTES);
-  if(!read_from_file("public_key.bin", &pk2, &big)) puts("ok!");
+  write_to_file("public_key.pubkey", pk, crypto_sign_PUBLICKEYBYTES);
+  write_to_file("secret_key.seckey", sk, crypto_sign_SECRETKEYBYTES);
+  if(!read_from_file("public_key.pubkey", &pk2, &big)) puts("ok!");
   printf("%d %d\n", big, memcmp(pk, pk2, big));
 }
