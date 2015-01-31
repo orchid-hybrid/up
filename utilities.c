@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "utilities.h"
+
 int write_to_file(char *filename, unsigned char bytes[], size_t bytes_length) {
   FILE *fptr;
   size_t written;
