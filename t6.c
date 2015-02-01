@@ -188,7 +188,7 @@ int main(int argc, char **argv) {
       puts("failed to perform decryption");
       return EXIT_FAILURE;
     }
-    if(write_to_file(output_filename, m + crypto_box_BOXZEROBYTES, input_size)) {
+    if(write_to_file(output_filename, m + crypto_box_ZEROBYTES, input_size + crypto_box_BOXZEROBYTES - crypto_box_ZEROBYTES)) {
       puts("failed to writed decrypted data");
       return EXIT_FAILURE;
     }
