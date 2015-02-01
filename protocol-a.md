@@ -16,8 +16,8 @@
 # Protocol:
 
 1. Alice and Bob generate new ephemeral public/private keypairs.
-2a. Alice encrypts Alice_eph_pub to bobs public key
-2b. Bob encrypts Bob_eph_pub to alices public key
+2. a. Alice encrypts Alice_eph_pub to bobs public key
+2. b. Bob encrypts Bob_eph_pub to alices public key
 3. Alice and Bob send each other the encrypted ephemeral public keys
 4. Alice generates a random key `k`
 5. Alice encrypts k to bobs ephemeral key and sends this to him
