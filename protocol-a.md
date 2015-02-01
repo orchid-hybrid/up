@@ -20,7 +20,7 @@
 * 2b. Bob encrypts Bob_eph_pub to alices public key
 * 3. Alice and Bob send each other the encrypted ephemeral public keys
 * 4. Alice generates a random key `k`
-* 5. Alice encrypts k to bobs ephemeral key and sends this to him
+* 5. Alice encrypts k to bobs ephemeral public key using her ephemeral private key and sends this to him
 * 6. Alice erases her ephemeral keypair
 * 7. Bob decrypts it
 * 8. Bob erases his ephemeral keypair
