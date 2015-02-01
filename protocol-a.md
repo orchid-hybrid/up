@@ -27,10 +27,10 @@
 
 # Analysis:
 
-(S1) is validated because messages are encrypted
-(S2) is validated because the ephemeral keypairs are erased, alice and bobs private keys only enable an attacker to see the public keys used
-(S3) is validated because a man in the middle would need alice or bobs private key to insert a fake ephemeral key
-(S4) is validated since a replay attack would fail since alice (or bob) would have generated a new ephemeral key unable to decrypt the replayed traffic.
+* (S1) is validated because messages are encrypted
+* (S2) is validated because the ephemeral keypairs are erased, alice and bobs private keys only enable an attacker to see the public keys used
+* (S3) is validated because a man in the middle would need alice or bobs private key to insert a fake ephemeral key
+* (S4) is validated since a replay attack would fail since alice (or bob) would have generated a new ephemeral key unable to decrypt the replayed traffic.
 
 # Notes:
 
