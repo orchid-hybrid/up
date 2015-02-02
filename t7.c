@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "network.h"
 
@@ -23,6 +24,29 @@
 // * lsof -i
 // * netstat -lptu
 // * netstat -tulpn
+
+#include <sys/types.h>
+#include <sys/socket.h>
+
+int sendall(int s, char *buf)
+{
+    int total = 0;        // how many bytes we've sent
+    int len = strlen(buf);
+    int bytesleft = len; // how many we have left to send
+    int n;
+
+    while(total < len) {
+      puts("...");
+      n = send(s, buf+total, bytesleft, 0);
+      if (n == -1) { break; }
+      total += n;
+      bytesleft -= n;
+    }
+    
+    //*len = total; // return number actually sent here
+
+    return n==-1?-1:0; // return -1 on failure, 0 on success
+} 
 
 const char *usage = "Usage: ./t7 send hostname port\n"
                     "       ./t7 listen hostname port\n";
@@ -58,7 +82,25 @@ int main(int argc, char **argv) {
     puts("Could not network..");
     return EXIT_FAILURE;
   }
+
+  if(mode == send_mode) {
+    char buf[4+1] = { 0 };
+    printf("send: %d\n", sendall(sock, "Beej was here!\n"));
+    recv(sock, &buf, 4, 0);
+    printf("> %s\n", buf);
+    sleep(3);
+  }
+  else if(mode == listen_mode){
+    char buf[15+1] = { 0 };
+    recv(sock, &buf, 15, 0);
+    printf("> %s\n", buf);
+    //while(recv(sock, &buf, 1, 0) != -1) { puts("."); }
+    printf("send: %d\n", sendall(sock, "hi!\n"));
+    //recv(sock, &buf, 15, 0);
+    sleep(3);
+  }
   
   close(sock);
+  
   return EXIT_SUCCESS;
 }
