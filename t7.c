@@ -85,17 +85,17 @@ int main(int argc, char **argv) {
 
   if(mode == send_mode) {
     char buf[4+1] = { 0 };
-    printf("send: %d\n", sendall(sock, "Beej was here!\n"));
-    recv(sock, &buf, 4, 0);
+    printf("send: %d\n", send(sock, "Beej was here!\n", 15, 0));
+    recv(sock, &buf, 4, MSG_WAITALL);
     printf("> %s\n", buf);
     sleep(3);
   }
   else if(mode == listen_mode){
     char buf[15+1] = { 0 };
-    recv(sock, &buf, 15, 0);
+    recv(sock, &buf, 15, MSG_WAITALL);
     printf("> %s\n", buf);
     //while(recv(sock, &buf, 1, 0) != -1) { puts("."); }
-    printf("send: %d\n", sendall(sock, "hi!\n"));
+    printf("send: %d\n", send(sock, "hi!\n", 4, 0));
     //recv(sock, &buf, 15, 0);
     sleep(3);
   }
