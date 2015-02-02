@@ -33,8 +33,8 @@ t5: t5.c utilities.o
 t6: t6.c utilities.o conf.o
 	$(CC) $(NACL_FLAGS) t6.c utilities.o conf.o $(NACL_LIBS) -o t6
 
-t7: t7.c utilities.o conf.o
-	$(CC) $(NACL_FLAGS) t7.c utilities.o conf.o $(NACL_LIBS) -o t7
+t7: t7.c network.o
+	$(CC) $(NACL_FLAGS) t7.c network.o $(NACL_LIBS) -o t7
 
 keys: t1
 	mkdir keys
@@ -60,14 +60,19 @@ utilities.o: utilities.c
 conf.o: conf.c
 	$(CC) $(NACL_FLAGS) -c conf.c -o conf.o
 
+network.o: network.c
+	$(CC) $(NACL_FLAGS) -c network.c -o network.o
+
 clean:
 	rm -f utilities.o
 	rm -f conf.o
+	rm -f network.o
 	rm -f t1
 	rm -f t2
 	rm -f t3
 	rm -f t4
 	rm -f t5
 	rm -f t6
+	rm -f t7
 	rm -r keys
 	rm -f addressbook.conf
