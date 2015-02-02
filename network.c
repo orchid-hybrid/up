@@ -35,13 +35,17 @@ int start_networking(int mode, char *hostname, char *port, int *sock_out) {
     puts("tick");
     if ((sock = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1 ) {
       perror("socket");
+
+      close(sock);
       return -1;
     }
 
     if(mode == send_mode) {
       if (connect(sock, p->ai_addr, p->ai_addrlen)) {
-	perror("connect");
-	return -1;
+	    perror("connect");
+
+        close(sock);
+        return -1;
       }
       
       *sock_out = sock;
@@ -55,7 +59,8 @@ int start_networking(int mode, char *hostname, char *port, int *sock_out) {
 	puts("waiting for a connection...");
 	if (listen(sock, 0)) {
 	  perror("listen");
-	  fprintf(stderr, "listen() call failed\n");
+
+      close(sock);
 	  return -1;
 	}
 	
@@ -63,16 +68,17 @@ int start_networking(int mode, char *hostname, char *port, int *sock_out) {
 	// p->ai_addr will now hold information about the host that made the connection
 	if ((conn = accept(sock, NULL, NULL)) == -1) {
 	  perror("accept");
-	  fprintf(stderr, "accept() call failed: error %d\n", errno);
-	  //fprintf(stderr, "EAGAIN: %d\n EWOULDBLOCK: %d\n EBADF: %d\n ECONNABORTED: %d\n EINTR: %d\n EINVAL: %d\n EMFILE: %d\n ENFILE: %d\n ENOBUFS: %d\n ENOMEM: %d\n ENOTSOCK: %d\n EOPNOTSUPP: %d\n EPROTO", EAGAIN, EWOULDBLOCK, EBADF, ECONNABORTED, EINTR, EINVAL, EMFILE, ENFILE, ENOBUFS, ENOMEM, ENOTSOCK, EOPNOTSUPP, EPROTO);
+
+      close(sock);
 	  return -1;
 	}
 	
-	*sock_out = sock;
+	*sock_out = conn;
 	return 0;
       }
     }
   }
 
+  close(sock);
   return -1;
 }
