@@ -16,10 +16,9 @@
 
 const char *usage = "Usage: ./t8 (client|server) <sender's public key> <sender's private key> <recipient's public key> <hostname> <port>\n";
 
-int sendall(int s, char *buf)
+int sendall(int s, char *buf, int len)
 {
     int total = 0;        // how many bytes we've sent
-    int len = strlen(buf);
     int bytesleft = len; // how many we have left to send
     int n;
 
@@ -116,7 +115,7 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
     if        (mode == send_mode) {
-        sendall(sock, a_epk_e);
+        sendall(sock, a_epk_e, ENCRYPTED_PUBLIC_KEY_SIZE);
 
         if (recv(sock, &b_epk_e, ENCRYPTED_PUBLIC_KEY_SIZE, MSG_WAITALL) !=
             crypto_box_PUBLICKEYBYTES) {
@@ -130,7 +129,7 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
         }
 
-        sendall(sock, a_epk_e);
+        sendall(sock, a_epk_e, ENCRYPTED_PUBLIC_KEY_SIZE);
 
         //crypto_box(epk_a_e, esk_a);
     }
