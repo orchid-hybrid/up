@@ -39,6 +39,9 @@ int main(int argc, char **argv) {
     int mode, sock;
     size_t length;
 
+    // FIXME !!!!!! zero nonce is bad!
+    unsigned char n[crypto_box_NONCEBYTES] = { 0 };
+
     // Alice's public and secret keys
     unsigned char *a_pk;
     unsigned char *a_sk;
@@ -108,7 +111,7 @@ int main(int argc, char **argv) {
     // encrypt our ephemeral public key with our non-ephemeral private key and
     // Bob's non-ephemeral public key
     crypto_box(a_epk_e, a_epk, crypto_box_PUBLICKEYBYTES +
-                               crypto_box_ZEROBYTES, 0, a_sk, b_pk);
+                               crypto_box_ZEROBYTES, n, a_sk, b_pk);
   
     if(start_networking(mode, argv[5], argv[6], &sock)) {
         puts("Could not network..");
