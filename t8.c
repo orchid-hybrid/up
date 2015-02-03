@@ -12,6 +12,7 @@
 #include "utilities.h"
 
 #define ENCRYPTED_PUBLIC_KEY_SIZE (crypto_box_PUBLICKEYBYTES + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES)
+#define ENCRYPTED_PADDED_PUBLIC_KEY_SIZE (crypto_box_PUBLICKEYBYTES + crypto_box_ZEROBYTES + crypto_box_BOXZEROBYTES)
 #define PADDING crypto_box_ZEROBYTES
 
 const char *usage = "Usage: ./t8 (client|server) <sender's public key> <sender's private key> <recipient's public key> <hostname> <port>\n";
@@ -49,19 +50,16 @@ int main(int argc, char **argv) {
     // Bob's public key
     unsigned char *b_pk;
 
-    // Alice's ephemeral public and secret keys
-    // includes padding for use with crypto_box()
+    // Alice's ephemeral public key, plus padding, and her ephemeral secret key
     unsigned char a_epk[crypto_box_PUBLICKEYBYTES + crypto_box_ZEROBYTES];
     unsigned char a_esk[crypto_box_SECRETKEYBYTES];
 
-    // Bob's ephemeral public key
-    unsigned char b_epk[crypto_box_PUBLICKEYBYTES];
+    // Bob's ephemeral public key, plus padding
+    unsigned char b_epk[crypto_box_PUBLICKEYBYTES + crypto_box_ZEROBYTES];
 
-    // Alice and Bob's encrypted ephemeral public keys
-    unsigned char a_epk_e[crypto_box_PUBLICKEYBYTES + crypto_box_ZEROBYTES];
-    unsigned char b_epk_e[crypto_box_PUBLICKEYBYTES + crypto_box_ZEROBYTES];
-
-    unsigned char scratch[1024];
+    // Alice and Bob's encrypted ephemeral public keys, plus padding
+    unsigned char a_epk_e[ENCRYPTED_PADDED_PUBLIC_KEY_SIZE];
+    unsigned char b_epk_e[ENCRYPTED_PADDED_PUBLIC_KEY_SIZE];
 
     if (argc != 1 + 6) {
         fprintf(stderr, usage);
@@ -107,33 +105,61 @@ int main(int argc, char **argv) {
 
     // our padding has to be set to 0
     memset(a_epk, 0, crypto_box_ZEROBYTES);
+    memset(b_epk_e, 0, crypto_box_BOXZEROBYTES);
 
     // encrypt our ephemeral public key with our non-ephemeral private key and
     // Bob's non-ephemeral public key
     crypto_box(a_epk_e, a_epk, crypto_box_PUBLICKEYBYTES +
                                crypto_box_ZEROBYTES, n, a_sk, b_pk);
+
+    // strip padding since we don't need it anymore
+    //*a_epk += crypto_box_ZEROBYTES;
+    *a_epk_e += crypto_box_BOXZEROBYTES;
   
     if(start_networking(mode, argv[5], argv[6], &sock)) {
         puts("Could not network..");
+        close(sock);
         return EXIT_FAILURE;
     }
     if        (mode == send_mode) {
+        // we begin by sending our encrypted ephemeral public key
         sendall(sock, a_epk_e, ENCRYPTED_PUBLIC_KEY_SIZE);
 
-        if (recv(sock, &b_epk_e, ENCRYPTED_PUBLIC_KEY_SIZE, MSG_WAITALL) !=
-            crypto_box_PUBLICKEYBYTES) {
+        // next, we recieve Bob's ephemeral public key,
+        if (recv(sock, &b_epk_e + crypto_box_BOXZEROBYTES, ENCRYPTED_PUBLIC_KEY_SIZE, MSG_WAITALL) !=
+            ENCRYPTED_PUBLIC_KEY_SIZE) {
             fprintf(stderr, "recv() failure");
-            return EXIT_FAILURE;
-        }
-    } else if (mode == listen_mode){
-        if (recv(sock, &b_epk_e, ENCRYPTED_PUBLIC_KEY_SIZE, MSG_WAITALL) !=
-            crypto_box_PUBLICKEYBYTES) {
-            fprintf(stderr, "recv() failure");
+            close(sock);
             return EXIT_FAILURE;
         }
 
+        // and decrypt it using Bob's non-ephemeral public key, and our non-
+        // ephemeral secret key
+        if (crypto_box_open(b_epk, b_epk_e, ENCRYPTED_PADDED_PUBLIC_KEY_SIZE,
+                        n, b_pk, a_sk) == -1) {
+            fprintf(stderr, "crypto_box_open() failed in client\n");
+            close(sock);
+            return EXIT_FAILURE;
+        }
+    } else if (mode == listen_mode) {
+        // daemon mode is identical to client mode except inverted send/recv
+
+        if (recv(sock, &b_epk_e + crypto_box_BOXZEROBYTES, ENCRYPTED_PUBLIC_KEY_SIZE, MSG_WAITALL) !=
+            ENCRYPTED_PUBLIC_KEY_SIZE) {
+            fprintf(stderr, "recv() failure");
+            close(sock);
+            return EXIT_FAILURE;
+        }
+
         sendall(sock, a_epk_e, ENCRYPTED_PUBLIC_KEY_SIZE);
 
-        //crypto_box(epk_a_e, esk_a);
+        if (crypto_box_open(b_epk, b_epk_e, ENCRYPTED_PADDED_PUBLIC_KEY_SIZE,
+                        n, b_pk, a_sk) == -1) {
+            fprintf(stderr, "crypto_box_open() failed in server\n");
+            close(sock);
+            return EXIT_FAILURE;
+        }
     }
+
+    return 0;
 }
