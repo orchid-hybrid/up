@@ -30,13 +30,13 @@ t4: t4.c utilities.o
 t5: t5.c utilities.o
 	$(CC) $(NACL_FLAGS) t5.c utilities.o $(NACL_LIBS) -o t5
 
-t6: t6.c utilities.o conf.o
-	$(CC) $(NACL_FLAGS) t6.c utilities.o conf.o $(NACL_LIBS) -o t6
+t6: t6.c utilities.o conf.o padded_array.o
+	$(CC) $(NACL_FLAGS) t6.c utilities.o conf.o padded_array.o $(NACL_LIBS) -o t6
 
 t7: t7.c network.o
 	$(CC) $(NACL_FLAGS) t7.c network.o $(NACL_LIBS) -o t7
-t8: t8.c utilities.o network.o
-	$(CC) $(NACL_FLAGS) t8.c utilities.o network.o $(NACL_LIBS) -o t8
+t8: t8.c utilities.o network.o padded_array.o
+	$(CC) $(NACL_FLAGS) t8.c utilities.o network.o padded_array.o $(NACL_LIBS) -o t8
 
 keys: t1
 	mkdir keys
@@ -59,16 +59,20 @@ addressbook.conf: keys
 utilities.o: utilities.c
 	$(CC) $(NACL_FLAGS) -c utilities.c -o utilities.o
 
-conf.o: conf.c
+conf.o: conf.c conf.h
 	$(CC) $(NACL_FLAGS) -c conf.c -o conf.o
 
-network.o: network.c
+network.o: network.c network.h
 	$(CC) $(NACL_FLAGS) -c network.c -o network.o
+
+padded_array.o: padded_array.c padded_array.h
+	$(CC) $(NACL_FLAGS) -c padded_array.c -o padded_array.o
 
 clean:
 	rm -f utilities.o
 	rm -f conf.o
 	rm -f network.o
+	rm -f padded_array.o
 	rm -f t1
 	rm -f t2
 	rm -f t3

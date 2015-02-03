@@ -7,35 +7,10 @@
 
 #include "utilities.h"
 #include "conf.h"
+#include "padded_array.h"
 
 #define encrypt_mode 0
 #define decrypt_mode 1
-
-/// Padded array stuff ///  ///  ///  ///  /
-
-typedef struct {
-  int padding;
-
-  // The array `bytes` is of length `padded_length = padding + length`
-  unsigned char *bytes;
-  int padded_length;
-
-  // The array `start` is of length `length`
-  unsigned char *start;
-  int length;
-} padded_array;
-
-padded_array padded_array_alloc(int p, int s) {
-  padded_array a;
-  a.padding = p;
-  a.padded_length = p + s;
-  a.length = s;
-  a.bytes = calloc(p + s, sizeof(char));
-  a.start = a.bytes + p;
-  return a;
-}
-
-///  ///  ///  ///  ///  ///  ///  ///  ///
 
 // Addressbook format is a list of lines with form
 // name pubkey_file
