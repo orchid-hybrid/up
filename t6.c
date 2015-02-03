@@ -11,6 +11,32 @@
 #define encrypt_mode 0
 #define decrypt_mode 1
 
+/// Padded array stuff ///  ///  ///  ///  /
+
+typedef struct {
+  int padding;
+
+  // The array `bytes` is of length `padded_length = padding + length`
+  unsigned char *bytes;
+  int padded_length;
+
+  // The array `start` is of length `length`
+  unsigned char *start;
+  int length;
+} padded_array;
+
+padded_array padded_array_alloc(int p, int s) {
+  padded_array a;
+  a.padding = p;
+  a.padded_length = p + s;
+  a.length = s;
+  a.bytes = calloc(p + s, sizeof(char));
+  a.start = a.bytes + p;
+  return a;
+}
+
+///  ///  ///  ///  ///  ///  ///  ///  ///
+
 // Addressbook format is a list of lines with form
 // name pubkey_file
 // or
@@ -158,37 +184,38 @@ int main(int argc, char **argv) {
   }
   
   if(mode == encrypt_mode) {
-    unsigned char *plaintext_padded;
-    unsigned char *c;
+    padded_array plaintext;
+    padded_array ciphertext;
+
+    plaintext = padded_array_alloc(crypto_box_ZEROBYTES, input_size);
+    memcpy(plaintext.start, input_bytes, plaintext.length);
     
-    plaintext_padded = calloc(crypto_box_ZEROBYTES + input_size, sizeof(char));
-    memcpy(plaintext_padded + crypto_box_ZEROBYTES, input_bytes, input_size);
+    // ciphertext has the same padded_length as plaintext, but a slightly different padding
+    ciphertext = padded_array_alloc(crypto_box_BOXZEROBYTES, input_size + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES);
     
-    c = calloc(crypto_box_ZEROBYTES + input_size, sizeof(char));
-    
-    if(crypto_box(c, plaintext_padded, crypto_box_ZEROBYTES + input_size, n, pk, sk)) {
+    if(crypto_box(ciphertext.bytes, plaintext.bytes, plaintext.padded_length, n, pk, sk)) {
       puts("failed to perform encryption");
       return EXIT_FAILURE;
     }
-    if(write_to_file(output_filename, c + crypto_box_BOXZEROBYTES, input_size + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES)) {
+    if(write_to_file(output_filename, ciphertext.start, ciphertext.length)) {
       puts("failed to writed encrypted data");
       return EXIT_FAILURE;
     }
   }
   else if(mode == decrypt_mode) {
-    unsigned char *ciphertext_padded;
-    unsigned char *m;
+    padded_array ciphertext;
+    padded_array plaintext;
     
-    ciphertext_padded = calloc(crypto_box_BOXZEROBYTES + input_size, sizeof(char));
-    memcpy(ciphertext_padded + crypto_box_BOXZEROBYTES, input_bytes, input_size);
+    ciphertext = padded_array_alloc(crypto_box_BOXZEROBYTES, input_size);
+    memcpy(ciphertext.start, input_bytes, input_size);
     
-    m = calloc(crypto_box_BOXZEROBYTES + input_size, sizeof(char));
+    plaintext = padded_array_alloc(crypto_box_ZEROBYTES, input_size + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES);
     
-    if(crypto_box_open(m, ciphertext_padded, crypto_box_BOXZEROBYTES + input_size, n, pk, sk)) {
+    if(crypto_box_open(plaintext.bytes, ciphertext.bytes, ciphertext.padded_length, n, pk, sk)) {
       puts("failed to perform decryption");
       return EXIT_FAILURE;
     }
-    if(write_to_file(output_filename, m + crypto_box_ZEROBYTES, input_size + crypto_box_BOXZEROBYTES - crypto_box_ZEROBYTES)) {
+    if(write_to_file(output_filename, plaintext.start, plaintext.length)) {
       puts("failed to writed decrypted data");
       return EXIT_FAILURE;
     }
