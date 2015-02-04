@@ -12,6 +12,6 @@ padded_array padded_array_make(unsigned char *b, int p, int s) {
   a.padded_length = p + s;
   a.length = s;
   a.bytes = b;
-  a.start = a.bytes + p;
+  a.start = b + p;
   return a;
 }

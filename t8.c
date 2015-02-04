@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -24,7 +25,7 @@ int sendall(int s, char *buf, int len)
   int n;
 
   while(total < len) {
-    puts("...");
+    //puts("...");
     n = send(s, buf+total, bytesleft, 0);
     if (n == -1) { break; }
     total += n;
@@ -96,11 +97,11 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
   
-  unsigned char a_epk_bytes[crypto_box_ZEROBYTES + crypto_box_PUBLICKEYBYTES];
-  unsigned char a_esk_bytes[0 + crypto_box_SECRETKEYBYTES];
-  unsigned char a_epk_enc_bytes[crypto_box_PUBLICKEYBYTES + crypto_box_ZEROBYTES];
-  unsigned char b_epk_enc_bytes[crypto_box_PUBLICKEYBYTES + crypto_box_ZEROBYTES];
-  unsigned char b_epk_bytes[crypto_box_ZEROBYTES + crypto_box_PUBLICKEYBYTES];
+  unsigned char a_epk_bytes[crypto_box_ZEROBYTES + crypto_box_PUBLICKEYBYTES] = { 0 };
+  unsigned char a_esk_bytes[0 + crypto_box_SECRETKEYBYTES] = { 0 };
+  unsigned char a_epk_enc_bytes[crypto_box_PUBLICKEYBYTES + crypto_box_ZEROBYTES] = { 0 };
+  unsigned char b_epk_enc_bytes[crypto_box_PUBLICKEYBYTES + crypto_box_ZEROBYTES] = { 0 };
+  unsigned char b_epk_bytes[crypto_box_ZEROBYTES + crypto_box_PUBLICKEYBYTES] = { 0 };
   
   padded_array a_epk;
   padded_array a_esk;
@@ -123,6 +124,7 @@ int main(int argc, char **argv) {
   
   // 2a. Alice encrypts her ephemeral public key with her non-ephemeral private key and Bob's non-ephemeral public key
   // 2b. Bob encrypts his ephemeral public key with his non-ephemeral private key and Alice's non-ephemeral public key
+  assert(a_epk_enc.padded_length == a_epk.padded_length);
   if(crypto_box(a_epk_enc.bytes, a_epk.bytes, a_epk.padded_length, n, b_pk, a_sk)) { FAIL("crypto_box 1"); }
 
   // 3. Alice and Bob send each other their encrypted ephemeral public keys
@@ -143,10 +145,10 @@ int main(int argc, char **argv) {
   // and decrypt it using Bob's non-ephemeral public key, and our non-ephemeral secret key
   if(crypto_box_open(b_epk.bytes, b_epk_enc.bytes, b_epk_enc.padded_length, n, b_pk, a_sk)) { FAIL("crypto_box_open 4") }
   
-  unsigned char a_key_bytes[crypto_box_ZEROBYTES + crypto_secretbox_KEYBYTES];
-  unsigned char a_key_enc_bytes[crypto_secretbox_KEYBYTES + crypto_box_ZEROBYTES];
-  unsigned char b_key_bytes[crypto_box_ZEROBYTES + crypto_secretbox_KEYBYTES];
-  unsigned char b_key_enc_bytes[crypto_secretbox_KEYBYTES + crypto_box_ZEROBYTES];
+  unsigned char a_key_bytes[crypto_box_ZEROBYTES + crypto_secretbox_KEYBYTES] = { 0 };
+  unsigned char a_key_enc_bytes[crypto_secretbox_KEYBYTES + crypto_box_ZEROBYTES] = { 0 };
+  unsigned char b_key_bytes[crypto_box_ZEROBYTES + crypto_secretbox_KEYBYTES] = { 0 };
+  unsigned char b_key_enc_bytes[crypto_secretbox_KEYBYTES + crypto_box_ZEROBYTES] = { 0 };
   
   padded_array a_key;
   padded_array a_key_enc;
@@ -155,7 +157,7 @@ int main(int argc, char **argv) {
   padded_array b_key_enc;
   
   a_key = padded_array_make(a_key_bytes, crypto_box_ZEROBYTES, crypto_secretbox_KEYBYTES);
-  a_key_enc = padded_array_make(b_key_enc_bytes, crypto_box_BOXZEROBYTES, crypto_secretbox_KEYBYTES + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES);
+  a_key_enc = padded_array_make(a_key_enc_bytes, crypto_box_BOXZEROBYTES, crypto_secretbox_KEYBYTES + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES);
 
   b_key = padded_array_make(b_key_bytes, crypto_box_ZEROBYTES, crypto_secretbox_KEYBYTES);
   b_key_enc = padded_array_make(b_key_enc_bytes, crypto_box_BOXZEROBYTES, crypto_secretbox_KEYBYTES + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES);
@@ -174,7 +176,7 @@ int main(int argc, char **argv) {
     if (recv(sock, b_key_enc.start, b_key_enc.length, MSG_WAITALL) != b_key_enc.length) { FAIL("recv 7") }
     sendall(sock, a_key_enc.start, a_key_enc.length);
   }
-  memset(a_key_enc.start, 0x00, a_key_enc.length);
+  memset(a_key_enc.bytes, 0x00, a_key_enc.padded_length);
   
   // 6. Alice and Bob decrypt their respective halves of the symmetric key
   // now we decrypt Bob's symmetric key using his ephemeral public key and our ephemeral private key

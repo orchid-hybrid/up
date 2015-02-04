@@ -49,3 +49,11 @@ int read_from_file(char *filename, unsigned char **bytes, size_t *bytes_length) 
   
   return 0;
 }
+
+void printhex(unsigned char *buf, int len) {
+  int i;
+  for(i = 0; i < len; i++) {
+    printf("%02x ", buf[i]);
+  }
+  printf("\n");
+}

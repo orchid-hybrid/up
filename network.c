@@ -29,7 +29,7 @@ int start_networking(int mode, char *hostname, char *port, int *sock_out) {
                        &servinfo);
 
   for (p = servinfo; p != NULL; p = p->ai_next) {
-    puts("tick");
+    //puts("tick");
     if ((sock = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1 ) {
       perror("socket");
 
