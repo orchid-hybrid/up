@@ -35,11 +35,11 @@ t6: t6.c utilities.o conf.o padded_array.o
 
 t7: t7.c network.o
 	$(CC) $(NACL_FLAGS) t7.c network.o $(NACL_LIBS) -o t7
-t8: t8.c utilities.o network.o padded_array.o
-	$(CC) $(NACL_FLAGS) t8.c utilities.o network.o padded_array.o $(NACL_LIBS) -o t8
+t8: t8.c utilities.o network.o padded_array.o protocol.o
+	$(CC) $(NACL_FLAGS) t8.c protocol.o utilities.o network.o padded_array.o $(NACL_LIBS) -o t8
 
 keys: t1
-	mkdir keys
+	mkdir -p keys
 	./t1
 	mv secret_key.seckey keys/alice.seckey
 	mv public_key.pubkey keys/alice.pubkey
@@ -64,6 +64,9 @@ conf.o: conf.c conf.h
 
 network.o: network.c network.h
 	$(CC) $(NACL_FLAGS) -c network.c -o network.o
+
+protocol.o: padded_array.o
+	$(CC) $(NACL_FLAGS) -c protocol.c -o protocol.o
 
 padded_array.o: padded_array.c padded_array.h
 	$(CC) $(NACL_FLAGS) -c padded_array.c -o padded_array.o
