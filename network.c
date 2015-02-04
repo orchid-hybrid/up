@@ -80,3 +80,22 @@ int start_networking(int mode, char *hostname, char *port, int *sock_out) {
   close(sock);
   return -1;
 }
+
+int sendall(int s, char *buf, int len)
+{
+  int total = 0;        // how many bytes we've sent
+  int bytesleft = len; // how many we have left to send
+  int n;
+
+  while(total < len) {
+    //puts("...");
+    n = send(s, buf+total, bytesleft, 0);
+    if (n == -1) { break; }
+    total += n;
+    bytesleft -= n;
+  }
+  
+  //*len = total; // return number actually sent here
+
+  return n==-1?-1:0; // return -1 on failure, 0 on success
+} 

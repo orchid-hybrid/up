@@ -13,7 +13,7 @@ NACL_FLAGS=-I$(NACL)/include -I$(NACL)/include/$(ABI)
 # the libs should come from $(NACL)/bin/oklibs-$(ABI)
 NACL_LIBS=$(NACL)/lib/$(ABI)/libnacl.a $(NACL)/lib/$(ABI)/randombytes.o $(NACL)/lib/$(ABI)/cpucycles.o -lrt -lm
 
-all: t1 t2 t3 t4 t5 t6 t7 t8 keys addressbook.conf
+all: t1 t2 t3 t4 t5 t6 t7 t8 up keys addressbook.conf
 
 t1: t1.c utilities.o
 	$(CC) $(NACL_FLAGS) t1.c utilities.o $(NACL_LIBS) -o t1
@@ -35,8 +35,12 @@ t6: t6.c utilities.o conf.o padded_array.o
 
 t7: t7.c network.o
 	$(CC) $(NACL_FLAGS) t7.c network.o $(NACL_LIBS) -o t7
+
 t8: t8.c utilities.o network.o padded_array.o protocol.o
-	$(CC) $(NACL_FLAGS) t8.c protocol.o utilities.o network.o padded_array.o $(NACL_LIBS) -o t8
+	$(CC) $(NACL_FLAGS) t8.c utilities.o network.o padded_array.o protocol.o $(NACL_LIBS) -o t8
+
+up: up.c utilities.o conf.o network.o padded_array.o protocol.o
+	$(CC) $(NACL_FLAGS) up.c utilities.o conf.o network.o padded_array.o protocol.o $(NACL_LIBS) -o up
 
 keys: t1
 	mkdir -p keys
@@ -85,3 +89,4 @@ clean:
 	rm -f t7
 	rm -r keys
 	rm -f addressbook.conf
+	rm -f up
