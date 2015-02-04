@@ -11,3 +11,4 @@ typedef struct {
 } padded_array;
 
 padded_array padded_array_alloc(int p, int s);
+padded_array padded_array_make(unsigned char *b, int p, int s);

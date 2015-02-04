@@ -19,191 +19,178 @@ const char *usage =
 
 int sendall(int s, char *buf, int len)
 {
-    int total = 0;        // how many bytes we've sent
-    int bytesleft = len; // how many we have left to send
-    int n;
+  int total = 0;        // how many bytes we've sent
+  int bytesleft = len; // how many we have left to send
+  int n;
 
-    while(total < len) {
-      puts("...");
-      n = send(s, buf+total, bytesleft, 0);
-      if (n == -1) { break; }
-      total += n;
-      bytesleft -= n;
-    }
-    
-    //*len = total; // return number actually sent here
+  while(total < len) {
+    puts("...");
+    n = send(s, buf+total, bytesleft, 0);
+    if (n == -1) { break; }
+    total += n;
+    bytesleft -= n;
+  }
+  
+  //*len = total; // return number actually sent here
 
-    return n==-1?-1:0; // return -1 on failure, 0 on success
+  return n==-1?-1:0; // return -1 on failure, 0 on success
 } 
 
 int main(int argc, char **argv) {
-    int mode, sock;
-    size_t length;
+  int mode, sock;
+  size_t length;
 
-    // FIXME !!!!!! zero nonce is bad!
-    unsigned char n[crypto_box_NONCEBYTES] = { 0 };
+  // FIXME !!!!!! zero nonce is bad!
+  unsigned char n[crypto_box_NONCEBYTES] = { 0 };
 
-    // Alice's public and secret keys
-    unsigned char *a_pk;
-    unsigned char *a_sk;
+  // Alice's public and secret keys
+  unsigned char *a_pk;
+  unsigned char *a_sk;
 
-    // Bob's public key
-    unsigned char *b_pk;
+  // Bob's public key
+  unsigned char *b_pk;
 
-    if (argc != 1 + 6) {
-        fprintf(stderr, usage);
-        return EXIT_FAILURE;
-    }
+  if (argc != 1 + 6) {
+    fprintf(stderr, usage);
+    return EXIT_FAILURE;
+  }
 
-    // read all the keys off the disk
-    if (read_from_file(argv[2], &a_pk, &length)) {
-        fprintf(stderr, "Failed to read sender's public key\n");
-        return EXIT_FAILURE;
-    }
-    if (length != crypto_box_PUBLICKEYBYTES) {
-        fprintf(stderr, "Failed to read sender's public key: incorrect size\n");
-    }
+  // read all the keys off the disk
+  if (read_from_file(argv[2], &a_pk, &length)) {
+    fprintf(stderr, "Failed to read sender's public key\n");
+    return EXIT_FAILURE;
+  }
+  if (length != crypto_box_PUBLICKEYBYTES) {
+    fprintf(stderr, "Failed to read sender's public key: incorrect size\n");
+  }
 
-    if (read_from_file(argv[3], &a_sk, &length)) {
-        fprintf(stderr, "Failed to read sender's private key\n");
-        return EXIT_FAILURE;
-    }
-    if (length != crypto_box_SECRETKEYBYTES) {
-        fprintf(stderr, "Failed to read sender's private key: incorrect size\n");
-    }
+  if (read_from_file(argv[3], &a_sk, &length)) {
+    fprintf(stderr, "Failed to read sender's private key\n");
+    return EXIT_FAILURE;
+  }
+  if (length != crypto_box_SECRETKEYBYTES) {
+    fprintf(stderr, "Failed to read sender's private key: incorrect size\n");
+  }
 
-    if (read_from_file(argv[4], &b_pk, &length)) {
-        fprintf(stderr, "Failed to read recipient's public key\n");
-        return EXIT_FAILURE;
-    }
-    if (length != crypto_box_PUBLICKEYBYTES) {
-        fprintf(stderr, "Failed to read recipient's public key: incorrect size\n");
-    }
+  if (read_from_file(argv[4], &b_pk, &length)) {
+    fprintf(stderr, "Failed to read recipient's public key\n");
+    return EXIT_FAILURE;
+  }
+  if (length != crypto_box_PUBLICKEYBYTES) {
+    fprintf(stderr, "Failed to read recipient's public key: incorrect size\n");
+  }
 
-    if        (!strcmp(argv[1], "client")) {
-        mode = send_mode;
-    } else if (!strcmp(argv[1], "server")) {
-        mode = listen_mode;
-    } else {
-        fprintf(stderr, usage);
-        return EXIT_FAILURE;
-    }
+  if        (!strcmp(argv[1], "client")) {
+    mode = send_mode;
+  } else if (!strcmp(argv[1], "server")) {
+    mode = listen_mode;
+  } else {
+    fprintf(stderr, usage);
+    return EXIT_FAILURE;
+  }
 
-    // generate an ephemeral keypair giving the public key
-    // the padding to encrypt it
-    padded_array a_epk;
-    padded_array a_esk;
-    padded_array a_epk_enc;
-    padded_array b_epk_enc;
-    padded_array b_epk;
+  // Connect
+  if(start_networking(mode, argv[5], argv[6], &sock)) {
+    puts("Could not network..");
+    close(sock);
+    return EXIT_FAILURE;
+  }
+  
+  unsigned char a_epk_bytes[crypto_box_ZEROBYTES + crypto_box_PUBLICKEYBYTES];
+  unsigned char a_esk_bytes[0 + crypto_box_SECRETKEYBYTES];
+  unsigned char a_epk_enc_bytes[crypto_box_PUBLICKEYBYTES + crypto_box_ZEROBYTES];
+  unsigned char b_epk_enc_bytes[crypto_box_PUBLICKEYBYTES + crypto_box_ZEROBYTES];
+  unsigned char b_epk_bytes[crypto_box_ZEROBYTES + crypto_box_PUBLICKEYBYTES];
+  
+  padded_array a_epk;
+  padded_array a_esk;
+  padded_array a_epk_enc;
+  padded_array b_epk_enc;
+  padded_array b_epk;
+  
+  a_epk = padded_array_make(a_epk_bytes, crypto_box_ZEROBYTES, crypto_box_PUBLICKEYBYTES);
+  a_esk = padded_array_make(a_esk_bytes, 0, crypto_box_SECRETKEYBYTES);
+  
+  a_epk_enc = padded_array_make(a_epk_enc_bytes, crypto_box_BOXZEROBYTES, crypto_box_PUBLICKEYBYTES + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES);
+  b_epk_enc = padded_array_make(b_epk_enc_bytes, crypto_box_BOXZEROBYTES, crypto_box_PUBLICKEYBYTES + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES);
+  
+  b_epk = padded_array_make(b_epk_bytes, crypto_box_ZEROBYTES, crypto_box_PUBLICKEYBYTES);
+  
+#define FAIL(er) { fprintf(stderr, "%s failure", er); close(sock); return EXIT_FAILURE; }
+  
+  // 1. Alice and Bob generate new ephemeral keypairs
+  crypto_box_keypair(a_epk.start, a_esk.start);
+  
+  // 2a. Alice encrypts her ephemeral public key with her non-ephemeral private key and Bob's non-ephemeral public key
+  // 2b. Bob encrypts his ephemeral public key with his non-ephemeral private key and Alice's non-ephemeral public key
+  crypto_box(a_epk_enc.bytes, a_epk.bytes, a_epk.padded_length, n, b_pk, a_sk);
+
+  // 3. Alice and Bob send each other their encrypted ephemeral public keys
+  if(mode == send_mode) {
+    // we begin by sending our encrypted ephemeral public key
+    sendall(sock, a_epk_enc.start, a_epk_enc.length);
     
-    a_epk = padded_array_alloc(crypto_box_ZEROBYTES, crypto_box_PUBLICKEYBYTES);
-    a_esk = padded_array_alloc(0, crypto_box_SECRETKEYBYTES);
-
-    a_epk_enc = padded_array_alloc(crypto_box_BOXZEROBYTES, crypto_box_PUBLICKEYBYTES + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES);
-    b_epk_enc = padded_array_alloc(crypto_box_BOXZEROBYTES, crypto_box_PUBLICKEYBYTES + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES);
+    // next, we recieve Bob's ephemeral public key,
+    if (recv(sock, b_epk_enc.start, b_epk_enc.length, MSG_WAITALL) != b_epk_enc.length) { FAIL("recv") }
+  }
+  else if(mode == listen_mode) { 
+    // daemon mode is identical to client mode except inverted send/recv
+    if (recv(sock, b_epk_enc.start, b_epk_enc.length, MSG_WAITALL) != b_epk_enc.length) { FAIL("recv") }
     
-    b_epk = padded_array_alloc(crypto_box_ZEROBYTES, crypto_box_PUBLICKEYBYTES);
-    
-    crypto_box_keypair(a_epk.start, a_esk.start);
-    
-    // encrypt our ephemeral public key with our non-ephemeral private key and
-    // Bob's non-ephemeral public key
-    crypto_box(a_epk_enc.bytes, a_epk.bytes, a_epk.padded_length, n, b_pk, a_sk);
-    
-    if(start_networking(mode, argv[5], argv[6], &sock)) {
-        puts("Could not network..");
-        close(sock);
-        return EXIT_FAILURE;
-    }
-    if        (mode == send_mode) {
-      // we begin by sending our encrypted ephemeral public key
-      sendall(sock, a_epk_enc.start, a_epk_enc.length);
-      
-      // next, we recieve Bob's ephemeral public key,
-      if (recv(sock, b_epk_enc.start, b_epk_enc.length, MSG_WAITALL) != b_epk_enc.length) {
-	fprintf(stderr, "recv() failure");
-	close(sock);
-	return EXIT_FAILURE;
-      }
-      
-      // and decrypt it using Bob's non-ephemeral public key, and our non-
-      // ephemeral secret key
-      if (crypto_box_open(b_epk.bytes, b_epk_enc.bytes, b_epk_enc.padded_length, n, b_pk, a_sk)) {
-	fprintf(stderr, "crypto_box_open() failed in client\n");
-	close(sock);
-	return EXIT_FAILURE;
-      }
-    } else if (mode == listen_mode) {
-      // daemon mode is identical to client mode except inverted send/recv
-      
-      if (recv(sock, b_epk_enc.start, b_epk_enc.length, MSG_WAITALL) != b_epk_enc.length) {
-	fprintf(stderr, "recv() failure");
-	close(sock);
-	return EXIT_FAILURE;
-      }
-      
-      sendall(sock, a_epk_enc.start, a_epk_enc.length);
-      
-      if (crypto_box_open(b_epk.bytes, b_epk_enc.bytes, b_epk_enc.padded_length,
-			  n, b_pk, a_sk)) {
-	fprintf(stderr, "crypto_box_open() failed in server\n");
-	close(sock);
-	return EXIT_FAILURE;
-      }
-    }
-    
-    //write_to_file((mode ? "alice.eph" : "bob.eph"), b_epk.start, b_epk.length);
+    sendall(sock, a_epk_enc.start, a_epk_enc.length);
+  }
 
-    // first we allocate space for our asymmetric keys
-    padded_array a_key;
-    padded_array a_key_enc;
+  // and decrypt it using Bob's non-ephemeral public key, and our non-ephemeral secret key
+  if (crypto_box_open(b_epk.bytes, b_epk_enc.bytes, b_epk_enc.padded_length, n, b_pk, a_sk)) { FAIL("crypto_box_open") }
+  
+  unsigned char a_key_bytes[crypto_box_ZEROBYTES + crypto_secretbox_KEYBYTES];
+  unsigned char a_key_enc_bytes[crypto_secretbox_KEYBYTES + crypto_box_ZEROBYTES];
+  unsigned char b_key_bytes[crypto_box_ZEROBYTES + crypto_secretbox_KEYBYTES];
+  unsigned char b_key_enc_bytes[crypto_secretbox_KEYBYTES + crypto_box_ZEROBYTES];
+  
+  padded_array a_key;
+  padded_array a_key_enc;
 
-    padded_array b_key;
-    padded_array b_key_enc;
+  padded_array b_key;
+  padded_array b_key_enc;
+  
+  a_key = padded_array_make(a_key_bytes, crypto_box_ZEROBYTES, crypto_secretbox_KEYBYTES);
+  a_key_enc = padded_array_make(b_key_enc_bytes, crypto_box_BOXZEROBYTES, crypto_secretbox_KEYBYTES + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES);
 
-    a_key = padded_array_alloc(crypto_box_ZEROBYTES, crypto_secretbox_KEYBYTES);
-    a_key_enc = padded_array_alloc(crypto_box_BOXZEROBYTES, crypto_secretbox_KEYBYTES + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES);
-
-    b_key = padded_array_alloc(crypto_box_ZEROBYTES, crypto_secretbox_KEYBYTES);
-    b_key_enc = padded_array_alloc(crypto_box_BOXZEROBYTES, crypto_secretbox_KEYBYTES + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES);
-
-    // now we generate our asymmetric key
-    randombytes(a_key.start, crypto_secretbox_KEYBYTES);
-
-    // and encrypt it with Alice's ephemeral secret key and Bob's ephemeral public key
-    crypto_box(a_key_enc.bytes, a_key.bytes, a_key.padded_length, n, b_epk.start, a_esk.start);
-    
-    // not encrypted yet
-    if        (mode == send_mode) {
-      sendall(sock, a_key_enc.start, a_key_enc.length);
-      
-      if (recv(sock, b_key_enc.start, b_key_enc.length, MSG_WAITALL) != b_key_enc.length) {
-        fprintf(stderr, "recv() failure");
-        close(sock);
-        return EXIT_FAILURE;
-      }
-    }
-    else if(mode == listen_mode) {
-      if (recv(sock, b_key_enc.start, b_key_enc.length, MSG_WAITALL) != b_key_enc.length) {
-        fprintf(stderr, "recv() failure");
-        close(sock);
-        return EXIT_FAILURE;
-      }
-
-      sendall(sock, a_key_enc.start, a_key_enc.length);
-    }
-
-    // now we decrypt Bob's symmetric key using his ephemeral public key and our ephemeral private key
-    crypto_box_open(b_key.bytes, b_key_enc.bytes, b_key_enc.padded_length, n, b_epk.start, a_esk.start);
-    
-    int i;
-    
-    for(i = 0; i < crypto_secretbox_KEYBYTES; i++) {
-      a_key.start[i] ^= b_key.start[i];
-    }
-
-    write_to_file((mode ? "alice.asymm" : "bob.asymm"), a_key.start, crypto_secretbox_KEYBYTES);
-    
-    return 0;
+  b_key = padded_array_make(b_key_bytes, crypto_box_ZEROBYTES, crypto_secretbox_KEYBYTES);
+  b_key_enc = padded_array_make(b_key_enc_bytes, crypto_box_BOXZEROBYTES, crypto_secretbox_KEYBYTES + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES);
+  
+  // 4. Alice and Bob both generate half of a symmetric key
+  randombytes(a_key.start, crypto_secretbox_KEYBYTES);
+  
+  // 5a. Alice encrypts her half of the symmetric key with her ephemeral private key and Bob's ephemeral public key, and sends this to him
+  // 5b. Bob encrypts his half of the symmetric key with his ephemeral private key and Alice's ephemeral public key, and sends this to her
+  crypto_box(a_key_enc.bytes, a_key.bytes, a_key.padded_length, n, b_epk.start, a_esk.start);
+  if(mode == send_mode) {
+    sendall(sock, a_key_enc.start, a_key_enc.length);
+    if (recv(sock, b_key_enc.start, b_key_enc.length, MSG_WAITALL) != b_key_enc.length) { FAIL("recv") }
+  }
+  else if(mode == listen_mode) {
+    if (recv(sock, b_key_enc.start, b_key_enc.length, MSG_WAITALL) != b_key_enc.length) { FAIL("recv") }
+    sendall(sock, a_key_enc.start, a_key_enc.length);
+  }
+  memset(a_key_enc.start, 0x00, a_key_enc.length);
+  
+  // 6. Alice and Bob decrypt their respective halves of the symmetric key
+  // now we decrypt Bob's symmetric key using his ephemeral public key and our ephemeral private key
+  crypto_box_open(b_key.bytes, b_key_enc.bytes, b_key_enc.padded_length, n, b_epk.start, a_esk.start);
+  
+  int i;
+  
+  for(i = 0; i < crypto_secretbox_KEYBYTES; i++) {
+    a_key.start[i] ^= b_key.start[i];
+  }
+  
+  // 7. Alice and Bob erase their ephemeral keypairs
+  memset(a_epk.start, 0x00, a_epk.length);
+  memset(a_esk.start, 0x00, a_esk.length);
+  
+  write_to_file((mode ? "alice.asymm" : "bob.asymm"), a_key.start, crypto_secretbox_KEYBYTES);
+  
+  return 0;
 }
