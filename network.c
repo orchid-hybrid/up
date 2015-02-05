@@ -37,7 +37,7 @@ int start_networking(int mode, char *hostname, char *port, int *sock_out) {
       return -1;
     }
 
-    if(mode == send_mode) {
+    if(mode == client_mode) {
       if (connect(sock, p->ai_addr, p->ai_addrlen)) {
         perror("connect");
 
@@ -48,7 +48,7 @@ int start_networking(int mode, char *hostname, char *port, int *sock_out) {
       *sock_out = sock;
       return 0;
     }
-    else if (mode == listen_mode) {
+    else if (mode == server_mode) {
       if (!bind(sock, p->ai_addr, p->ai_addrlen)) {
         // should now listen until it gets a connection
 

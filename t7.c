@@ -43,9 +43,9 @@ int main(int argc, char **argv) {
   }
   
   if (!strcmp(argv[1], "send")) {
-    mode = send_mode;
+    mode = client_mode;
   } else if (!strcmp(argv[1], "listen")) {
-    mode = listen_mode;
+    mode = server_mode;
   } else {
     fprintf(stderr, usage);
     return EXIT_FAILURE;
@@ -63,14 +63,14 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-  if(mode == send_mode) {
+  if(mode == client_mode) {
     char buf[4+1] = { 0 };
     printf("send: %d\n", send(sock, "Beej was here!\n", 15, 0));
     recv(sock, &buf, 4, MSG_WAITALL);
     printf("> %s\n", buf);
     sleep(3);
   }
-  else if(mode == listen_mode){
+  else if(mode == server_mode){
     char buf[15+1] = { 0 };
     recv(sock, &buf, 15, MSG_WAITALL);
     printf("> %s\n", buf);

@@ -53,15 +53,15 @@ int key_exchange(unsigned char *a_sk,
   if(crypto_box(a_epk_enc.bytes, a_epk.bytes, a_epk.padded_length, n, b_pk, a_sk)) { FAIL("crypto_box 1"); }
 
   // 3. Alice and Bob send each other their encrypted ephemeral public keys
-  if(mode == send_mode) {
+  if(mode == client_mode) {
     // we begin by sending our encrypted ephemeral public key
     sendall(sock, a_epk_enc.start, a_epk_enc.length);
     
     // next, we recieve Bob's ephemeral public key,
     if (recv(sock, b_epk_enc.start, b_epk_enc.length, MSG_WAITALL) != b_epk_enc.length) { FAIL("recv 2") }
   }
-  else if(mode == listen_mode) { 
-    // daemon mode is identical to client mode except inverted send/recv
+  else if(mode == server_mode) { 
+    // server mode is identical to client mode except inverted send/recv
     if (recv(sock, b_epk_enc.start, b_epk_enc.length, MSG_WAITALL) != b_epk_enc.length) { FAIL("recv 3") }
     
     sendall(sock, a_epk_enc.start, a_epk_enc.length);
@@ -93,11 +93,11 @@ int key_exchange(unsigned char *a_sk,
   // 5a. Alice encrypts her half of the symmetric key with her ephemeral private key and Bob's ephemeral public key, and sends this to him
   // 5b. Bob encrypts his half of the symmetric key with his ephemeral private key and Alice's ephemeral public key, and sends this to her
   if(crypto_box(a_key_enc.bytes, a_key.bytes, a_key.padded_length, n, b_epk.start, a_esk.start)) { FAIL("crypto_box 5") }
-  if(mode == send_mode) {
+  if(mode == client_mode) {
     sendall(sock, a_key_enc.start, a_key_enc.length);
     if (recv(sock, b_key_enc.start, b_key_enc.length, MSG_WAITALL) != b_key_enc.length) { FAIL("recv 6") }
   }
-  else if(mode == listen_mode) {
+  else if(mode == server_mode) {
     if (recv(sock, b_key_enc.start, b_key_enc.length, MSG_WAITALL) != b_key_enc.length) { FAIL("recv 7") }
     sendall(sock, a_key_enc.start, a_key_enc.length);
   }

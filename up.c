@@ -8,9 +8,7 @@
 
 #include "conf.h"
 #include "protocol.h"
-
-#define client_mode 0
-#define server_mode 1
+#include "network.h"
 
 #define push_mode 0
 #define pull_mode 1
@@ -227,7 +225,7 @@ int main(int argc, char **argv) {
   if(start_networking(network_mode, ip_address, port, &sock)) {
     printf("Could not open networking to <%s:%s>\n", ip_address, port);
   }
-  
+
   if(network_mode == server_mode) {
     if(sendall(sock, (send_mode == push_mode) ? "PUSH" : "PULL", 4)) {
       puts("network error 1");
@@ -260,7 +258,7 @@ int main(int argc, char **argv) {
     printf("mode error: both parties trying to <%s> a file to the other.\n", (send_mode == push_mode) ? "PUSH" : "PULL");
     return EXIT_FAILURE;
   }
-
+  
   key_exchange(a_sk, b_pk, key_bytes, network_mode, sock);
   
   return EXIT_SUCCESS;

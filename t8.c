@@ -63,9 +63,9 @@ int main(int argc, char **argv) {
   }
 
   if        (!strcmp(argv[1], "client")) {
-    mode = send_mode;
+    mode = client_mode;
   } else if (!strcmp(argv[1], "server")) {
-    mode = listen_mode;
+    mode = server_mode;
   } else {
     fprintf(stderr, usage);
     return EXIT_FAILURE;
