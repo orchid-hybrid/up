@@ -71,14 +71,16 @@ conf *load_conf_file(char *filename) {
 }
 
 /* addressbook has format:
-   e ::= name
-
+   <entry> ::= <name> <pubkey>                       // 2
+             | <name> <pubkey> <seckey>              // 3
+             | <name> <pubkey> <ip> <port>           // 4
+             | <name> <pubkey> <seckey> <ip> <port>  // 5
 */
 int validate_addressbook(conf *c) {
   int i;
 
   for(i = 0; i < c->length; i++) {
-    if(!(c->lines[i].length < 2 || c->lines[i].length > 5))
+    if(c->lines[i].length < 2 || c->lines[i].length > 5)
       return -1;
   }
 

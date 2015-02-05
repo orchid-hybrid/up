@@ -14,3 +14,6 @@ typedef struct conf {
 // load_conf_file will return NULL on failure
 // it will read a file and parse it into lines/words
 conf *load_conf_file(char *filename);
+
+int validate_addressbook(conf *c);
+line *lookup_addressbook(conf *c, char *name);

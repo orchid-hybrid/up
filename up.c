@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <crypto_box.h>
+#include <crypto_secretbox.h>
+#include <randombytes.h>
+
 #include "conf.h"
 
 #define server_mode 0
@@ -14,27 +18,45 @@ void usage() {
        "USAGE: set up ~/.config/up/addressbook.conf and then\n"
        "\n"
        "Alice running a server, sending a file to Bob:\n"
-       " alice$ ./up server push bob foo.txt\n"
-       " bobby$ ./up client pull alice\n"
+       " alice$ ./up server push alice bob foo.txt\n"
+       " bobby$ ./up client pull bob alice\n"
        "\n"
        "Alice running a server, receiving a file from Bob:\n"
-       " alice$ ./up server pull bob\n"
-       " bobby$ ./up client push alice foo.txt\n"
+       " alice$ ./up server pull alice bob\n"
+       " bobby$ ./up client push bob alice foo.txt\n"
        );
 }
 
 int main(int argc, char **argv) {
   int network_mode;
   int send_mode;
-  char *contact;
+  char *self_nick;
+  char *contact_nick;
+  
   char *filename;
+  FILE *fptr;
+  long file_length;
 
   conf *c;
 
-  char **self_entry;
-  char **contact_entry;
+  line *self_entry;
+  line *contact_entry;
+  line *e;
+
+  char *a_sk_filename;
+  char *b_pk_filename;
+
+  int length;
   
-  if(argc != 1 + 3 && argc != 1 + 4) {
+  unsigned char *a_sk; // Alices secret key
+  unsigned char *b_pk; // Bob's public key
+  
+  char *ip_address, *port;
+  
+  ////////////////////////////////
+  // Argument parsing
+
+  if(argc != 1 + 4 && argc != 1 + 5) {
     usage();
     return EXIT_FAILURE;
   }
@@ -61,27 +83,133 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
   
-  contact = argv[3];
+  self_nick = argv[3];
+  
+  contact_nick = argv[4];
 
   if(send_mode == push_mode) {
+    if(argc != 1 + 5) {
+      usage();
+      return EXIT_FAILURE;
+    }
+
+    filename = argv[5];
+  }
+  else if(send_mode == pull_mode) {
     if(argc != 1 + 4) {
       usage();
       return EXIT_FAILURE;
     }
+  }
 
-    filename = argv[4];
-  }
-  else if(send_mode == pull_mode) {
-    if(argc != 1 + 3) {
-      usage();
-      return EXIT_FAILURE;
-    }
-  }
+  ////////////////////////////////
+  // Loading things
+
+  // Load the configuration file
   
   c = load_conf_file("addressbook.conf");
+  if(!c) {
+    puts("Could not load addressbook.conf!");
+    return EXIT_FAILURE;
+  }
+  if(validate_addressbook(c)) {
+    puts("The addressbook.conf appears invalid!");
+    return EXIT_FAILURE;
+  }
+
+  // Lookup entries inside it
   
-  self_entry = lookup_addressbook_self(c);
-  contact_entry = lookup_addressbook_contact(c, contact);
+  self_entry = lookup_addressbook(c, self_nick);
+  if(!self_entry) {
+    printf("Could not find <%s> in addressbook.conf!\n", self_nick);
+    return EXIT_FAILURE;
+  }
+  
+  contact_entry = lookup_addressbook(c, contact_nick);
+  if(!contact_entry) {
+    printf("Could not find <%s> in addressbook.conf!\n", contact_nick);
+    return EXIT_FAILURE;
+  }
+
+  if(send_mode == push_mode) {
+    // Check that the file we want to send exists
+    // get it's size, open it
+
+    // TODO
+  }
+  
+  // we need to know our own secret key
+  if(!(self_entry->length == 3 || self_entry->length == 5)) {
+    printf("There is no secret key listed for <%s> in addressbook.conf!\n", self_nick);
+    return EXIT_FAILURE;
+  }
+  a_sk_filename = self_entry->word[2];
+  if (read_from_file(a_sk_filename, &a_sk, &length)) {
+    fprintf(stderr, "Failed to read <%s> secret key\n", self_nick);
+    return EXIT_FAILURE;
+  }
+  if (length != crypto_box_SECRETKEYBYTES) {
+    fprintf(stderr, "Failed to read <%s>'s private key: incorrect size\n", self_nick);
+    return EXIT_FAILURE;
+  }
+  
+  // we need to know our contacts public key
+  b_pk_filename = contact_entry->word[1];
+  if (read_from_file(b_pk_filename, &b_pk, &length)) {
+    fprintf(stderr, "Failed to read <%s> public key\n", contact_nick);
+    return EXIT_FAILURE;
+  }
+  if (length != crypto_box_PUBLICKEYBYTES) {
+    fprintf(stderr, "Failed to read <%s>'s public key: incorrect size\n", contact_nick);
+    return EXIT_FAILURE;
+  }
+  
+  if(network_mode == server_mode) {
+    // if we are acting as a server then
+    // we need an ip and port for our self
+
+    e = self_entry;
+  }
+  else if(network_mode == client_mode) {
+    // if we are acting as a client then
+    // we need an ip and port for our contact
+    
+    e = contact_entry;
+  }
+  
+  if(!(e->length == 4 || e->length == 5)) {
+    printf("There is no ip/port listed for <%s> in addressbook.conf!\n", ((network_mode == server_mode) ? self_nick : contact_nick));
+    return EXIT_FAILURE;
+  }
+  
+  if(e->length == 4) {
+    ip_address = e->word[2];
+    port = e->word[3];
+  }
+  else if(e->length == 5) {
+    ip_address = e->word[3];
+    port = e->word[4];
+  }
+
+  ////////////////////////////////
+  // Everything is loaded
+  //
+  // At this point everything we need has been parsed from the
+  // argument list, and loaded and checked:
+  //
+  // modes:             network_mode, send_mode
+  // Alices secret key: a_sk
+  // Bobs public key:   b_pk
+  // ip address:        ip_address
+  // Port:              port
+  //
+  // and in the case of send_mode, we also have:
+  // 
+  // Filename:          filename
+  // file handle:       fptr
+  // Filesize:          file_length
+
+  // TODO: Verify that this really holds
   
   return EXIT_SUCCESS;
 }

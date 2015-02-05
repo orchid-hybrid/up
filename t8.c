@@ -42,6 +42,7 @@ int main(int argc, char **argv) {
   }
   if (length != crypto_box_PUBLICKEYBYTES) {
     fprintf(stderr, "Failed to read sender's public key: incorrect size\n");
+    return EXIT_FAILURE;
   }
 
   if (read_from_file(argv[3], &a_sk, &length)) {
@@ -50,6 +51,7 @@ int main(int argc, char **argv) {
   }
   if (length != crypto_box_SECRETKEYBYTES) {
     fprintf(stderr, "Failed to read sender's private key: incorrect size\n");
+    return EXIT_FAILURE;
   }
 
   if (read_from_file(argv[4], &b_pk, &length)) {
@@ -77,7 +79,7 @@ int main(int argc, char **argv) {
   }
 
   unsigned char key[crypto_secretbox_KEYBYTES + crypto_box_ZEROBYTES] = {0};
-  key_exchange(a_pk, a_sk, b_pk, key, mode, sock);
+  key_exchange(a_sk, b_pk, key, mode, sock);
   
   write_to_file((mode ? "alice.asymm" : "bob.asymm"), key + crypto_box_ZEROBYTES, crypto_secretbox_KEYBYTES);
   

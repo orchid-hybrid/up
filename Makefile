@@ -13,7 +13,7 @@ NACL_FLAGS=-I$(NACL)/include -I$(NACL)/include/$(ABI)
 # the libs should come from $(NACL)/bin/oklibs-$(ABI)
 NACL_LIBS=$(NACL)/lib/$(ABI)/libnacl.a $(NACL)/lib/$(ABI)/randombytes.o $(NACL)/lib/$(ABI)/cpucycles.o -lrt -lm
 
-all: t1 t2 t3 t4 t5 t6 t7 t8 up keys addressbook.conf
+all: t1 t2 t3 t4 t5 t6 t7 t8 up
 
 t1: t1.c utilities.o
 	$(CC) $(NACL_FLAGS) t1.c utilities.o $(NACL_LIBS) -o t1
