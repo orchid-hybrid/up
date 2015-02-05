@@ -7,9 +7,10 @@
 #include <randombytes.h>
 
 #include "conf.h"
+#include "protocol.h"
 
-#define server_mode 0
-#define client_mode 1
+#define client_mode 0
+#define server_mode 1
 
 #define push_mode 0
 #define pull_mode 1
@@ -51,6 +52,10 @@ int main(int argc, char **argv) {
   
   unsigned char *a_sk; // Alices secret key
   unsigned char *b_pk; // Bob's public key
+
+  // our ephemeral symmetric key, with padding and without
+  unsigned char key_bytes[crypto_secretbox_KEYBYTES] = { 0 };
+  unsigned char *key = key_bytes + crypto_box_ZEROBYTES;
   
   char *ip_address, *port;
   
@@ -239,7 +244,7 @@ int main(int argc, char **argv) {
       return EXIT_FAILURE;
     }
   }
-  
+
   if(!strcmp("PUSH", contact_mode_str)) {
     contact_mode = push_mode;
   }
@@ -255,6 +260,8 @@ int main(int argc, char **argv) {
     printf("mode error: both parties trying to <%s> a file to the other.\n", (send_mode == push_mode) ? "PUSH" : "PULL");
     return EXIT_FAILURE;
   }
+
+  key_exchange(a_sk, b_pk, key_bytes, network_mode, sock);
   
   return EXIT_SUCCESS;
 }
