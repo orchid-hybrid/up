@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/socket.h>
 
 #include <crypto_box.h>
 #include <crypto_secretbox.h>
@@ -52,6 +53,10 @@ int main(int argc, char **argv) {
   unsigned char *b_pk; // Bob's public key
   
   char *ip_address, *port;
+  
+  int sock;
+  char contact_mode_str[5] = { 0 };
+  int contact_mode;
   
   ////////////////////////////////
   // Argument parsing
@@ -210,6 +215,46 @@ int main(int argc, char **argv) {
   // Filesize:          file_length
 
   // TODO: Verify that this really holds
+
+  // start networking and figure out whose-who and whether this
+  // transaction will work
+
+  if(start_networking(network_mode, ip_address, port, &sock)) {
+    printf("Could not open networking to <%s:%s>\n", ip_address, port);
+  }
+  
+  if(network_mode == server_mode) {
+    if(sendall(sock, (send_mode == push_mode) ? "PUSH" : "PULL", 4)) {
+      puts("network error 1");
+      return EXIT_FAILURE;
+    }
+    
+    recv(sock, &contact_mode_str, 4, MSG_WAITALL);
+  }
+  else if(network_mode == client_mode) {
+    recv(sock, &contact_mode_str, 4, MSG_WAITALL);
+    
+    if(sendall(sock, (send_mode == push_mode) ? "PUSH" : "PULL", 4)) {
+      puts("network error 2");
+      return EXIT_FAILURE;
+    }
+  }
+  
+  if(!strcmp("PUSH", contact_mode_str)) {
+    contact_mode = push_mode;
+  }
+  else if(!strcmp("PULL", contact_mode_str)) {
+    contact_mode = pull_mode;
+  }
+  else {
+    puts("contact sent garbage mode string during handshake");
+    return EXIT_FAILURE;
+  }
+
+  if(send_mode == contact_mode) {
+    printf("mode error: both parties trying to <%s> a file to the other.\n", (send_mode == push_mode) ? "PUSH" : "PULL");
+    return EXIT_FAILURE;
+  }
   
   return EXIT_SUCCESS;
 }
