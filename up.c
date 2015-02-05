@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "conf.h"
+
 #define server_mode 0
 #define client_mode 1
 

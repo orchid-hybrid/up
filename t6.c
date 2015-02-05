@@ -12,33 +12,6 @@
 #define encrypt_mode 0
 #define decrypt_mode 1
 
-// Addressbook format is a list of lines with form
-// name pubkey_file
-// or
-// name pubkey_file privkey_file
-
-int validate_addressbook(conf *c) {
-  int i;
-
-  for(i = 0; i < c->length; i++) {
-    if(!(c->lines[i].length == 2 || c->lines[i].length == 3))
-      return -1;
-  }
-
-  return 0;
-}
-
-line *lookup_addressbook(conf *c, char *name) {
-  int i;
-
-  for(i = 0; i < c->length; i++) {
-    if(!strcmp(name, c->lines[i].word[0]))
-      return &c->lines[i];
-  }
-
-  return NULL;
-}
-
 int load_secret_key(conf *c, char *name, unsigned char *k) {
   line *entry;
 

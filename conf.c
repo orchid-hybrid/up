@@ -14,7 +14,7 @@ void split(char *c, char sep, char ***words_out, int *len_out) {
   
   len = 0;
   alloc = 1;
-  words = malloc(alloc*sizeof(char*));
+  words = malloc(alloc * sizeof(char*));
   
   while(1) {
     // skip to the start of a word
@@ -68,4 +68,30 @@ conf *load_conf_file(char *filename) {
   }
   
   return c;
+}
+
+/* addressbook has format:
+   e ::= name
+
+*/
+int validate_addressbook(conf *c) {
+  int i;
+
+  for(i = 0; i < c->length; i++) {
+    if(!(c->lines[i].length < 2 || c->lines[i].length > 5))
+      return -1;
+  }
+
+  return 0;
+}
+
+line *lookup_addressbook(conf *c, char *name) {
+  int i;
+
+  for(i = 0; i < c->length; i++) {
+    if(!strcmp(name, c->lines[i].word[0]))
+      return &c->lines[i];
+  }
+
+  return NULL;
 }
