@@ -31,6 +31,14 @@ void usage() {
        );
 }
 
+padded_array plaintext_alloc(int s) {
+  return padded_array_alloc(crypto_secretbox_ZEROBYTES, s);
+}
+
+padded_array ciphertext_alloc(int s) {
+  return padded_array_alloc(crypto_secretbox_BOXZEROBYTES, s + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES);
+}
+
 void send_e(int sock,
             int flags,
             // plaintext, padding must be cypto_secretbox_ZEROBYTES
@@ -88,7 +96,7 @@ int main(int argc, char **argv) {
   char *a_sk_filename;
   char *b_pk_filename;
 
-  int length;
+  unsigned int length;
   
   unsigned char *a_sk; // Alices secret key
   unsigned char *b_pk; // Bob's public key
@@ -308,22 +316,50 @@ int main(int argc, char **argv) {
   
   key_exchange(a_sk, b_pk, key_bytes, network_mode, sock);
   
-  plaintext = padded_array_alloc(crypto_secretbox_ZEROBYTES, 5);
-  ciphertext = padded_array_alloc(crypto_secretbox_BOXZEROBYTES, 5 + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES);
+  char *buffer;
+  unsigned char network_length[4];
+
+  padded_array plain = plaintext_alloc(4);
+  padded_array cipher = ciphertext_alloc(4);
   
   if(send_mode == push_mode) {
-    memcpy(plaintext.start, "HELLO", plaintext.length);
-    send_e(sock, 0, &plaintext, &ciphertext, n, key);
-    
-    recv_e(sock, MSG_WAITALL, &plaintext, &ciphertext, n, key);
-    printf("%c%c%c%c%c\n", plaintext.start[0], plaintext.start[1], plaintext.start[2], plaintext.start[3], plaintext.start[4]);
+    read_from_file(filename, &buffer, &length);
+    printf("length is: %d\n", length);
+
+    network_length[0] = length & 0xFF;
+    network_length[1] = (length >> 8) & 0xFF;
+    network_length[2] = (length >> 16) & 0xFF;
+    network_length[3] = (length >> 24) & 0xFF;
+    printf("contents of network_length: %X%X%X%X\n", network_length[0], network_length[1], network_length[2], network_length[3]);
+
+    memcpy(plain.start, network_length, 4);
+    send_e(sock, 0, &plain, &cipher, n, key);
+
+    plain = plaintext_alloc(length);
+    cipher = ciphertext_alloc(length);
+
+    memcpy(plain.start, buffer, length);
+    send_e(sock, 0, &plain, &cipher, n, key);
   }
   else if(send_mode == pull_mode) {
-    recv_e(sock, MSG_WAITALL, &plaintext, &ciphertext, n, key);
-    printf("%c%c%c%c%c\n", plaintext.start[0], plaintext.start[1], plaintext.start[2], plaintext.start[3], plaintext.start[4]);
-    
-    memcpy(plaintext.start, "YESHI", plaintext.length);
-    send_e(sock, 0, &plaintext, &ciphertext, n, key);
+    recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key);
+    memcpy(network_length, plain.start, 4);
+    printf("contents of network_length: %2X%2X%2X%2X\n", network_length[0], network_length[1], network_length[2], network_length[3]);
+
+    length = network_length[0];
+    length |= network_length[1] << 8;
+    length |= network_length[2] << 16;
+    length |= network_length[3] << 24;
+
+
+    printf("length is: %d\n", length);
+
+    plain = plaintext_alloc(length);
+    cipher = ciphertext_alloc(length);
+
+    recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key);
+
+    write_to_file("FILE.BIN", plain.start, plain.length);
   }
   
   return EXIT_SUCCESS;
