@@ -7,18 +7,21 @@
 // and then chop it up into lines
 // then it will chop each line into words
 
-void split(char *c, char sep, char ***words_out, int *len_out) {
+void split(char *c, int c_len, char sep, char ***words_out, int *len_out) {
   char **words;
   int len;
   int alloc;
-  
+
+  int pos;
+
+  pos = 0;
   len = 0;
   alloc = 1;
   words = malloc(alloc * sizeof(char*));
   
   while(1) {
     // skip to the start of a word
-    while(*c == sep) { *c = 0; c++; }
+    while(*c == sep) { *c = 0; c++; pos++; if(pos > c_len) { puts("DIED1"); } }
     if(*c == 0) {
       *len_out = len;
       *words_out = words;
@@ -34,7 +37,7 @@ void split(char *c, char sep, char ***words_out, int *len_out) {
     }
 
     // skip the words content
-    while(*c && *c != sep) { c++; }
+    while(*c && *c != sep) { c++; pos++; if(pos > c_len) { puts("DIED"); } }
     
   }
 }
@@ -59,12 +62,12 @@ conf *load_conf_file(char *filename) {
     return NULL;
   }
   
-  split(bytes, '\n', &lines, &lines_len);
+  split(bytes, length-1, '\n', &lines, &lines_len);
   c->length = lines_len;
   c->lines = malloc(c->length*sizeof(line));
   
   for(i = 0; i < lines_len; i++) {
-    split(lines[i], ' ', &c->lines[i].word, &c->lines[i].length);
+    split(lines[i], strlen(lines[i]), ' ', &c->lines[i].word, &c->lines[i].length);
   }
   
   return c;

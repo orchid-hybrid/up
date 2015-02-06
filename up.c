@@ -102,7 +102,7 @@ int main(int argc, char **argv) {
   char *a_sk_filename;
   char *b_pk_filename;
 
-  unsigned int length;
+  size_t length;
   
   unsigned char *a_sk; // Alices secret key
   unsigned char *b_pk; // Bob's public key

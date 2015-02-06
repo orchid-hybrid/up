@@ -33,11 +33,12 @@ int read_from_file(char *filename, unsigned char **bytes, size_t *bytes_length) 
   *bytes_length = ftell(fptr);
   fseek(fptr, 0, SEEK_SET);
 
-  *bytes = malloc(*bytes_length);
+  *bytes = malloc(*bytes_length + 1);
   if(!*bytes) {
     fclose(fptr);
     return -1;
   }
+  (*bytes)[*bytes_length] = '\0';
   
   size = fread(*bytes, *bytes_length, 1, fptr);
   if(size != 1) {

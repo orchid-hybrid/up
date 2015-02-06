@@ -7,7 +7,7 @@ ABI=amd64
 
 # select CC from $(NACL)/bin/okc-$(ABI)
 #CC=gcc -m64 -O3 -fomit-frame-pointer -funroll-loops
-CC=gcc -m64 -fsanitize=address -fno-omit-frame-pointer
+CC=gcc -g -m64 -fsanitize=address -fno-omit-frame-pointer
 
 NACL_FLAGS=-I$(NACL)/include -I$(NACL)/include/$(ABI)
 
