@@ -299,9 +299,8 @@ int main(int argc, char **argv) {
   }
   
   key_exchange(a_sk, b_pk, key_bytes, network_mode, sock);
-
   
-  if(contact_mode == push_mode) {
+  if(send_mode == push_mode) {
     //padded_array send_buf = padded_array_convert("hello", crypto_secretbox_ZEROBYTES, 5);
     //send_e(sock, &send_buf, 0, key);
 
@@ -325,7 +324,7 @@ int main(int argc, char **argv) {
     //printhex(key, crypto_secretbox_KEYBYTES);
     //printhex(ciphertext.start, ciphertext.length);
   }
-  else if(contact_mode == pull_mode) {
+  else if(send_mode == pull_mode) {
     //padded_array recv_buf = padded_array_alloc(crypto_secretbox_BOXZEROBYTES, CIPHERTEXT_LENGTH_S(5));
     //recv_e(sock, &recv_buf, MSG_WAITALL, key);
 
