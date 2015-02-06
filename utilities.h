@@ -9,3 +9,5 @@ int write_to_file(char *filename, unsigned char bytes[], size_t bytes_length);
 int read_from_file(char *filename, unsigned char **bytes, size_t *bytes_length);
 
 void printhex(unsigned char *buf, int len);
+
+void increment_nonce(unsigned char *n, int length);

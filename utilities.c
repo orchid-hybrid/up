@@ -57,3 +57,18 @@ void printhex(unsigned char *buf, int len) {
   }
   printf("\n");
 }
+
+void increment_nonce(unsigned char *n, int length) {
+  int p;
+
+  for(p = 0; p < length; p++) {
+    n[p]++;
+    if(!n[p]) {
+      p++;
+      continue;
+    }
+    else {
+      break;
+    }
+  }
+}

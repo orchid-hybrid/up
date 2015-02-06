@@ -15,8 +15,6 @@
 #define push_mode 0
 #define pull_mode 1
 
-#define CIPHERTEXT_LENGTH_A(l) (l + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES)
-#define CIPHERTEXT_LENGTH_S(l) (l + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES)
 #define FAIL(err) { fprintf(stderr, "%s failure\n", err); close(sock); return EXIT_FAILURE; }
 
 void usage() {
@@ -47,6 +45,7 @@ void send_e(int sock,
     puts("crypto_secretbox failed in send!");
     return;
   }
+  increment_nonce(n);
   
   sendall(sock, c->start, c->length);
 }
@@ -59,7 +58,7 @@ void recv_e(int sock,
             padded_array *c,
             unsigned char *n,
             unsigned char *key) {
-  recv(sock, c->start, CIPHERTEXT_LENGTH_S(p->length), MSG_WAITALL);
+  recv(sock, c->start, c->length, MSG_WAITALL);
   
   if (crypto_secretbox_open(p->bytes,
                             c->bytes,
@@ -67,6 +66,7 @@ void recv_e(int sock,
     puts("crypto_secretbox_open failed in recv!");
     return;
   }
+  increment_nonce(n);
 }
 
 int main(int argc, char **argv) {
@@ -102,6 +102,11 @@ int main(int argc, char **argv) {
   int sock;
   char contact_mode_str[5] = { 0 };
   int contact_mode;
+  
+  padded_array plaintext;
+  padded_array ciphertext;
+  
+  unsigned char n[crypto_secretbox_NONCEBYTES] = { 0 };
   
   ////////////////////////////////
   // Argument parsing
@@ -302,23 +307,23 @@ int main(int argc, char **argv) {
   }
   
   key_exchange(a_sk, b_pk, key_bytes, network_mode, sock);
-
-    padded_array plaintext;
-    padded_array ciphertext;
-
-    unsigned char n[crypto_secretbox_NONCEBYTES] = { 0 };
-
-    plaintext = padded_array_alloc(crypto_secretbox_ZEROBYTES, 5);
-    memcpy(plaintext.start, "HELLO", plaintext.length);
-    
-    ciphertext = padded_array_alloc(crypto_secretbox_BOXZEROBYTES, 5 + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES);
+  
+  plaintext = padded_array_alloc(crypto_secretbox_ZEROBYTES, 5);
+  ciphertext = padded_array_alloc(crypto_secretbox_BOXZEROBYTES, 5 + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES);
   
   if(send_mode == push_mode) {
+    memcpy(plaintext.start, "HELLO", plaintext.length);
     send_e(sock, 0, &plaintext, &ciphertext, n, key);
+    
+    recv_e(sock, MSG_WAITALL, &plaintext, &ciphertext, n, key);
+    printf("%c%c%c%c%c\n", plaintext.start[0], plaintext.start[1], plaintext.start[2], plaintext.start[3], plaintext.start[4]);
   }
   else if(send_mode == pull_mode) {
     recv_e(sock, MSG_WAITALL, &plaintext, &ciphertext, n, key);
     printf("%c%c%c%c%c\n", plaintext.start[0], plaintext.start[1], plaintext.start[2], plaintext.start[3], plaintext.start[4]);
+    
+    memcpy(plaintext.start, "YESHI", plaintext.length);
+    send_e(sock, 0, &plaintext, &ciphertext, n, key);
   }
   
   return EXIT_SUCCESS;
