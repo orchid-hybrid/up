@@ -15,6 +15,8 @@
 #define push_mode 0
 #define pull_mode 1
 
+#define CIPHERTEXT_LENGTH_A(l) (l + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES)
+#define CIPHERTEXT_LENGTH_S(l) (l + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES)
 #define FAIL(err) { fprintf(stderr, "%s failure\n", err); close(sock); return EXIT_FAILURE; }
 
 void usage() {
@@ -191,6 +193,10 @@ int main(int argc, char **argv) {
     // get it's size, open it
 
     // TODO
+
+    // for now just read entire file
+
+    read_from_file();
   }
   
   // we need to know our own secret key
