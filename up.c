@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 
 #include <crypto_box.h>
@@ -37,15 +38,15 @@ void send_e(int sock,
             int flags,
             unsigned char *key) {
   unsigned char n[crypto_secretbox_NONCEBYTES] = { 0 };
-  padded_array buffer_e = padded_array_alloc(crypto_secretbox_BOXZEROBYTES,
-                                             CIPHERTEXT_LENGTH_S(buffer->length));
+  padded_array buffer_e = padded_array_alloc(crypto_secretbox_BOXZEROBYTES, buffer->padded_length + crypto_secretbox_BOXZEROBYTES - crypto_secretbox_ZEROBYTES);
   if (crypto_secretbox(buffer_e.bytes,
                        buffer->bytes,
                        buffer->padded_length, n, key)) {
-    FAIL("send()");
+    puts("crypto_secretbox failed in send!");
+    return;
   }
-
-  sendall(sock, buffer_e.start, CIPHERTEXT_LENGTH_S(buffer->length));
+  
+  sendall(sock, buffer_e.start, buffer_e.length);
 }
 
 void recv_e(int sock,
@@ -53,15 +54,15 @@ void recv_e(int sock,
             int flags,
             unsigned char *key) {
   unsigned char n[crypto_secretbox_NONCEBYTES] = { 0 };
-  padded_array buffer_e = padded_array_alloc(crypto_secretbox_BOXZEROBYTES,
-                                             buffer->length);
-
-  recv(sock, buffer_e.start, buffer->length, MSG_WAITALL);
+  padded_array buffer_e = padded_array_alloc(crypto_secretbox_BOXZEROBYTES, buffer->length + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES);
+  
+  recv(sock, buffer_e.start, buffer_e.length, MSG_WAITALL);
   
   if (crypto_secretbox_open(buffer->bytes,
                             buffer_e.bytes,
                             buffer_e.padded_length, n, key)) {
-    FAIL("recv()");
+    puts("crypto_secretbox_open failed in recv!");
+    return;
   }
 }
 
@@ -90,7 +91,7 @@ int main(int argc, char **argv) {
   unsigned char *b_pk; // Bob's public key
 
   // our ephemeral symmetric key, with padding and without
-  unsigned char key_bytes[crypto_secretbox_KEYBYTES] = { 0 };
+  unsigned char key_bytes[crypto_secretbox_KEYBYTES + crypto_box_ZEROBYTES] = { 0 };
   unsigned char *key = key_bytes + crypto_box_ZEROBYTES;
   
   char *ip_address, *port;
@@ -299,14 +300,54 @@ int main(int argc, char **argv) {
   
   key_exchange(a_sk, b_pk, key_bytes, network_mode, sock);
 
-  padded_array recv_buf = padded_array_alloc(crypto_secretbox_BOXZEROBYTES, CIPHERTEXT_LENGTH_S(5));
-  padded_array send_buf = padded_array_convert("hello", crypto_secretbox_ZEROBYTES, 5);
+  
+  if(contact_mode == push_mode) {
+    //padded_array send_buf = padded_array_convert("hello", crypto_secretbox_ZEROBYTES, 5);
+    //send_e(sock, &send_buf, 0, key);
 
-  if(contact_mode == pull_mode) {
-    recv_e(sock, &recv_buf, MSG_WAITALL, key);
+    padded_array plaintext;
+    padded_array ciphertext;
+
+    unsigned char n[crypto_secretbox_NONCEBYTES] = { 0 };
+
+    plaintext = padded_array_alloc(crypto_secretbox_ZEROBYTES, 5);
+    memcpy(plaintext.start, "HELLO", plaintext.length);
+    
+    ciphertext = padded_array_alloc(crypto_secretbox_BOXZEROBYTES, 5 + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES);
+    
+    if (crypto_secretbox(ciphertext.bytes, plaintext.bytes, plaintext.padded_length, n, key)) {
+      puts("crypto_secretbox failed in send!");
+      return;
+    }
+    
+    sendall(sock, ciphertext.start, ciphertext.length);
+
+    //printhex(key, crypto_secretbox_KEYBYTES);
+    //printhex(ciphertext.start, ciphertext.length);
   }
-  else {
-    send_e(sock, &send_buf, 0, key);
+  else if(contact_mode == pull_mode) {
+    //padded_array recv_buf = padded_array_alloc(crypto_secretbox_BOXZEROBYTES, CIPHERTEXT_LENGTH_S(5));
+    //recv_e(sock, &recv_buf, MSG_WAITALL, key);
+
+    padded_array ciphertext;
+    padded_array plaintext;
+
+    unsigned char n[crypto_secretbox_NONCEBYTES] = { 0 };
+    
+    ciphertext = padded_array_alloc(crypto_secretbox_BOXZEROBYTES, 5 + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES);
+    recv(sock, ciphertext.start, ciphertext.length, MSG_WAITALL);
+
+    //printhex(key, crypto_secretbox_KEYBYTES);
+    //printhex(ciphertext.start, ciphertext.length);
+    
+    plaintext = padded_array_alloc(crypto_secretbox_ZEROBYTES, 5);
+    
+    if (crypto_secretbox_open(plaintext.bytes, ciphertext.bytes, ciphertext.padded_length, n, key)) {
+      puts("crypto_secretbox_open failed in recv!");
+      return;
+    }
+
+    printf("%c%c%c%c%c\n", plaintext.start[0], plaintext.start[1], plaintext.start[2], plaintext.start[3], plaintext.start[4]);
   }
   
   return EXIT_SUCCESS;
