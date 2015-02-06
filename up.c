@@ -34,33 +34,36 @@ void usage() {
 }
 
 void send_e(int sock,
-            padded_array *buffer,
             int flags,
+            // plaintext, padding must be cypto_secretbox_ZEROBYTES
+            padded_array *p,
+            // ciphertext, padding must be crypto_secretbox_BOXZEROBYTES
+            padded_array *c,
+            unsigned char *n,
             unsigned char *key) {
-  unsigned char n[crypto_secretbox_NONCEBYTES] = { 0 };
-  padded_array buffer_e = padded_array_alloc(crypto_secretbox_BOXZEROBYTES, buffer->padded_length + crypto_secretbox_BOXZEROBYTES - crypto_secretbox_ZEROBYTES);
-  if (crypto_secretbox(buffer_e.bytes,
-                       buffer->bytes,
-                       buffer->padded_length, n, key)) {
+  if (crypto_secretbox(c->bytes,
+                       p->bytes,
+                       p->padded_length, n, key)) {
     puts("crypto_secretbox failed in send!");
     return;
   }
   
-  sendall(sock, buffer_e.start, buffer_e.length);
+  sendall(sock, c->start, c->length);
 }
 
 void recv_e(int sock,
-            padded_array *buffer,
             int flags,
+            // plaintext, padding must be cypto_secretbox_ZEROBYTES
+            padded_array *p,
+            // ciphertext, padding must be crypto_secretbox_BOXZEROBYTES
+            padded_array *c,
+            unsigned char *n,
             unsigned char *key) {
-  unsigned char n[crypto_secretbox_NONCEBYTES] = { 0 };
-  padded_array buffer_e = padded_array_alloc(crypto_secretbox_BOXZEROBYTES, buffer->length + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES);
+  recv(sock, c->start, CIPHERTEXT_LENGTH_S(p->length), MSG_WAITALL);
   
-  recv(sock, buffer_e.start, buffer_e.length, MSG_WAITALL);
-  
-  if (crypto_secretbox_open(buffer->bytes,
-                            buffer_e.bytes,
-                            buffer_e.padded_length, n, key)) {
+  if (crypto_secretbox_open(p->bytes,
+                            c->bytes,
+                            c->padded_length, n, key)) {
     puts("crypto_secretbox_open failed in recv!");
     return;
   }
@@ -299,10 +302,6 @@ int main(int argc, char **argv) {
   }
   
   key_exchange(a_sk, b_pk, key_bytes, network_mode, sock);
-  
-  if(send_mode == push_mode) {
-    //padded_array send_buf = padded_array_convert("hello", crypto_secretbox_ZEROBYTES, 5);
-    //send_e(sock, &send_buf, 0, key);
 
     padded_array plaintext;
     padded_array ciphertext;
@@ -313,39 +312,12 @@ int main(int argc, char **argv) {
     memcpy(plaintext.start, "HELLO", plaintext.length);
     
     ciphertext = padded_array_alloc(crypto_secretbox_BOXZEROBYTES, 5 + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES);
-    
-    if (crypto_secretbox(ciphertext.bytes, plaintext.bytes, plaintext.padded_length, n, key)) {
-      puts("crypto_secretbox failed in send!");
-      return;
-    }
-    
-    sendall(sock, ciphertext.start, ciphertext.length);
-
-    //printhex(key, crypto_secretbox_KEYBYTES);
-    //printhex(ciphertext.start, ciphertext.length);
+  
+  if(send_mode == push_mode) {
+    send_e(sock, 0, &plaintext, &ciphertext, n, key);
   }
   else if(send_mode == pull_mode) {
-    //padded_array recv_buf = padded_array_alloc(crypto_secretbox_BOXZEROBYTES, CIPHERTEXT_LENGTH_S(5));
-    //recv_e(sock, &recv_buf, MSG_WAITALL, key);
-
-    padded_array ciphertext;
-    padded_array plaintext;
-
-    unsigned char n[crypto_secretbox_NONCEBYTES] = { 0 };
-    
-    ciphertext = padded_array_alloc(crypto_secretbox_BOXZEROBYTES, 5 + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES);
-    recv(sock, ciphertext.start, ciphertext.length, MSG_WAITALL);
-
-    //printhex(key, crypto_secretbox_KEYBYTES);
-    //printhex(ciphertext.start, ciphertext.length);
-    
-    plaintext = padded_array_alloc(crypto_secretbox_ZEROBYTES, 5);
-    
-    if (crypto_secretbox_open(plaintext.bytes, ciphertext.bytes, ciphertext.padded_length, n, key)) {
-      puts("crypto_secretbox_open failed in recv!");
-      return;
-    }
-
+    recv_e(sock, MSG_WAITALL, &plaintext, &ciphertext, n, key);
     printf("%c%c%c%c%c\n", plaintext.start[0], plaintext.start[1], plaintext.start[2], plaintext.start[3], plaintext.start[4]);
   }
   
