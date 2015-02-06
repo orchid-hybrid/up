@@ -208,7 +208,7 @@ int main(int argc, char **argv) {
 
     // for now just read entire file
 
-    read_from_file();
+    //read_from_file();
   }
   
   // we need to know our own secret key

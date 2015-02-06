@@ -6,7 +6,8 @@ NACL=./nacl-20110221/build/$(HOSTNAME)
 ABI=amd64
 
 # select CC from $(NACL)/bin/okc-$(ABI)
-CC=gcc -m64 -O3 -fomit-frame-pointer -funroll-loops
+#CC=gcc -m64 -O3 -fomit-frame-pointer -funroll-loops
+CC=gcc -m64 -fsanitize=address -fno-omit-frame-pointer
 
 NACL_FLAGS=-I$(NACL)/include -I$(NACL)/include/$(ABI)
 
@@ -87,6 +88,4 @@ clean:
 	rm -f t5
 	rm -f t6
 	rm -f t7
-	rm -r keys
-	rm -f addressbook.conf
 	rm -f up
