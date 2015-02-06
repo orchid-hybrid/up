@@ -41,7 +41,7 @@ padded_array ciphertext_alloc(int s) {
   return padded_array_alloc(crypto_secretbox_BOXZEROBYTES, s + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES);
 }
 
-void send_e(int sock,
+int send_e(int sock,
             int flags,
             // plaintext, padding must be cypto_secretbox_ZEROBYTES
             padded_array *p,
@@ -53,14 +53,16 @@ void send_e(int sock,
                        p->bytes,
                        p->padded_length, n, key)) {
     puts("crypto_secretbox failed in send!");
-    return;
+    return -1;
   }
   increment_nonce(n);
   
   sendall(sock, c->start, c->length);
+
+  return 0;
 }
 
-void recv_e(int sock,
+int recv_e(int sock,
             int flags,
             // plaintext, padding must be cypto_secretbox_ZEROBYTES
             padded_array *p,
@@ -74,9 +76,11 @@ void recv_e(int sock,
                             c->bytes,
                             c->padded_length, n, key)) {
     puts("crypto_secretbox_open failed in recv!");
-    return;
+    return -1;
   }
   increment_nonce(n);
+
+  return 0;
 }
 
 int main(int argc, char **argv) {
@@ -329,6 +333,8 @@ int main(int argc, char **argv) {
   padded_array cipher = ciphertext_alloc(4);
   
   if(send_mode == push_mode) {
+    printhex(key, crypto_secretbox_KEYBYTES);
+    
     read_from_file(filename, &buffer, &length);
     printf("length is: %d\n", length);
 
@@ -339,16 +345,19 @@ int main(int argc, char **argv) {
     printf("contents of network_length: %X%X%X%X\n", network_length[0], network_length[1], network_length[2], network_length[3]);
 
     memcpy(plain.start, network_length, 4);
-    send_e(sock, 0, &plain, &cipher, n, key);
+    if(send_e(sock, 0, &plain, &cipher, n, key)) return EXIT_FAILURE;
 
     plain = plaintext_alloc(length);
     cipher = ciphertext_alloc(length);
 
     memcpy(plain.start, buffer, length);
-    send_e(sock, 0, &plain, &cipher, n, key);
+    if(send_e(sock, 0, &plain, &cipher, n, key)) return EXIT_FAILURE;
   }
   else if(send_mode == pull_mode) {
-    recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key);
+    printhex(key, crypto_secretbox_KEYBYTES);
+    if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) return EXIT_FAILURE;
+    printhex(key, crypto_secretbox_KEYBYTES);
+    
     memcpy(network_length, plain.start, 4);
     printf("contents of network_length: %2X%2X%2X%2X\n", network_length[0], network_length[1], network_length[2], network_length[3]);
 
@@ -356,14 +365,15 @@ int main(int argc, char **argv) {
     length |= network_length[1] << 8;
     length |= network_length[2] << 16;
     length |= network_length[3] << 24;
-
-
+    
     printf("length is: %d\n", length);
 
     plain = plaintext_alloc(length);
     cipher = ciphertext_alloc(length);
 
-    recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key);
+    printhex(key, crypto_secretbox_KEYBYTES);
+    if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) return EXIT_FAILURE;
+    printhex(key, crypto_secretbox_KEYBYTES);
 
     write_to_file("FILE.BIN", plain.start, plain.length);
   }
