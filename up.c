@@ -7,11 +7,16 @@
 #include <randombytes.h>
 
 #include "conf.h"
-#include "protocol.h"
 #include "network.h"
+#include "padded_array.h"
+#include "protocol.h"
 
 #define push_mode 0
 #define pull_mode 1
+
+#define CIPHERTEXT_LENGTH_A(l) (l + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES)
+#define CIPHERTEXT_LENGTH_S(l) (l + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES)
+#define FAIL(err) { fprintf(stderr, "%s failure\n", err); close(sock); return EXIT_FAILURE; }
 
 void usage() {
   puts(
@@ -25,6 +30,39 @@ void usage() {
        " alice$ ./up server pull alice bob\n"
        " bobby$ ./up client push bob alice foo.txt\n"
        );
+}
+
+void send_e(int sock,
+            padded_array *buffer,
+            int flags,
+            unsigned char *key) {
+  unsigned char n[crypto_secretbox_NONCEBYTES] = { 0 };
+  padded_array buffer_e = padded_array_alloc(crypto_secretbox_BOXZEROBYTES,
+                                             CIPHERTEXT_LENGTH_S(buffer->length));
+  if (crypto_secretbox(buffer_e.bytes,
+                       buffer->bytes,
+                       buffer->padded_length, n, key)) {
+    FAIL("send()");
+  }
+
+  sendall(sock, buffer_e.start, CIPHERTEXT_LENGTH_S(buffer->length));
+}
+
+void recv_e(int sock,
+            padded_array *buffer,
+            int flags,
+            unsigned char *key) {
+  unsigned char n[crypto_secretbox_NONCEBYTES] = { 0 };
+  padded_array buffer_e = padded_array_alloc(crypto_secretbox_BOXZEROBYTES,
+                                             buffer->length);
+
+  recv(sock, buffer_e.start, buffer->length, MSG_WAITALL);
+  
+  if (crypto_secretbox_open(buffer->bytes,
+                            buffer_e.bytes,
+                            buffer_e.padded_length, n, key)) {
+    FAIL("recv()");
+  }
 }
 
 int main(int argc, char **argv) {
@@ -260,6 +298,16 @@ int main(int argc, char **argv) {
   }
   
   key_exchange(a_sk, b_pk, key_bytes, network_mode, sock);
+
+  padded_array recv_buf = padded_array_alloc(crypto_secretbox_BOXZEROBYTES, CIPHERTEXT_LENGTH_S(5));
+  padded_array send_buf = padded_array_convert("hello", crypto_secretbox_ZEROBYTES, 5);
+
+  if(contact_mode == pull_mode) {
+    recv_e(sock, &recv_buf, MSG_WAITALL, key);
+  }
+  else {
+    send_e(sock, &send_buf, 0, key);
+  }
   
   return EXIT_SUCCESS;
 }
