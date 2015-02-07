@@ -55,10 +55,9 @@ int send_e(int sock,
     puts("crypto_secretbox failed in send!");
     return -1;
   }
-  increment_nonce(n);
-  
-  sendall(sock, c->start, c->length);
 
+  increment_nonce(n, crypto_secretbox_NONCEBYTES);
+  sendall(sock, c->start, c->length);
   return 0;
 }
 
@@ -76,10 +75,10 @@ int recv_e(int sock,
                             c->bytes,
                             c->padded_length, n, key)) {
     puts("crypto_secretbox_open failed in recv!");
-    return -1;
+      return -1;
   }
-  increment_nonce(n);
 
+  increment_nonce(n, crypto_secretbox_NONCEBYTES);
   return 0;
 }
 
@@ -333,16 +332,12 @@ int main(int argc, char **argv) {
   padded_array cipher = ciphertext_alloc(4);
   
   if(send_mode == push_mode) {
-    printhex(key, crypto_secretbox_KEYBYTES);
-    
     read_from_file(filename, &buffer, &length);
-    printf("length is: %d\n", length);
 
     network_length[0] = length & 0xFF;
     network_length[1] = (length >> 8) & 0xFF;
     network_length[2] = (length >> 16) & 0xFF;
     network_length[3] = (length >> 24) & 0xFF;
-    printf("contents of network_length: %X%X%X%X\n", network_length[0], network_length[1], network_length[2], network_length[3]);
 
     memcpy(plain.start, network_length, 4);
     if(send_e(sock, 0, &plain, &cipher, n, key)) return EXIT_FAILURE;
@@ -354,26 +349,17 @@ int main(int argc, char **argv) {
     if(send_e(sock, 0, &plain, &cipher, n, key)) return EXIT_FAILURE;
   }
   else if(send_mode == pull_mode) {
-    printhex(key, crypto_secretbox_KEYBYTES);
     if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) return EXIT_FAILURE;
-    printhex(key, crypto_secretbox_KEYBYTES);
-    
+
     memcpy(network_length, plain.start, 4);
-    printf("contents of network_length: %2X%2X%2X%2X\n", network_length[0], network_length[1], network_length[2], network_length[3]);
 
     length = network_length[0];
     length |= network_length[1] << 8;
     length |= network_length[2] << 16;
     length |= network_length[3] << 24;
-    
-    printf("length is: %d\n", length);
 
     plain = plaintext_alloc(length);
     cipher = ciphertext_alloc(length);
-
-    printhex(key, crypto_secretbox_KEYBYTES);
-    if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) return EXIT_FAILURE;
-    printhex(key, crypto_secretbox_KEYBYTES);
 
     write_to_file("FILE.BIN", plain.start, plain.length);
   }
