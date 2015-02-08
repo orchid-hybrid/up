@@ -62,7 +62,7 @@ conf *load_conf_file(char *filename) {
     return NULL;
   }
   
-  split(bytes, length-1, '\n', &lines, &lines_len);
+  split(bytes, length, '\n', &lines, &lines_len);
   c->length = lines_len;
   c->lines = malloc(c->length*sizeof(line));
   

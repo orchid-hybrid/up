@@ -288,8 +288,10 @@ int main(int argc, char **argv) {
 
   if(start_networking(network_mode, ip_address, port, &sock)) {
     printf("Could not open networking to <%s:%s>\n", ip_address, port);
+    return EXIT_FAILURE;
   }
-
+  puts("got a connection from <>!"); // TODO print address
+  
   if(network_mode == server_mode) {
     if(sendall(sock, (send_mode == push_mode) ? "PUSH" : "PULL", 4)) {
       puts("network error 1");
@@ -317,13 +319,16 @@ int main(int argc, char **argv) {
     puts("contact sent garbage mode string during handshake");
     return EXIT_FAILURE;
   }
-
+  
   if(send_mode == contact_mode) {
     printf("mode error: both parties trying to <%s> a file to the other.\n", (send_mode == push_mode) ? "PUSH" : "PULL");
     return EXIT_FAILURE;
   }
   
-  key_exchange(a_sk, b_pk, key_bytes, network_mode, sock);
+  if(key_exchange(a_sk, b_pk, key_bytes, network_mode, sock)) {
+    fprintf(stderr, "key exchange failed");
+    return EXIT_FAILURE;
+  }
   
   char *buffer;
   unsigned char network_length[4];
@@ -340,16 +345,16 @@ int main(int argc, char **argv) {
     network_length[3] = (length >> 24) & 0xFF;
 
     memcpy(plain.start, network_length, 4);
-    if(send_e(sock, 0, &plain, &cipher, n, key)) return EXIT_FAILURE;
+    if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F1"); return EXIT_FAILURE; }
 
     plain = plaintext_alloc(length);
     cipher = ciphertext_alloc(length);
 
     memcpy(plain.start, buffer, length);
-    if(send_e(sock, 0, &plain, &cipher, n, key)) return EXIT_FAILURE;
+    if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F2"); return EXIT_FAILURE; }
   }
   else if(send_mode == pull_mode) {
-    if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) return EXIT_FAILURE;
+    if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F3"); return EXIT_FAILURE; }
 
     memcpy(network_length, plain.start, 4);
 
@@ -360,6 +365,8 @@ int main(int argc, char **argv) {
 
     plain = plaintext_alloc(length);
     cipher = ciphertext_alloc(length);
+    
+    if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F4"); return EXIT_FAILURE; }
 
     write_to_file("FILE.BIN", plain.start, plain.length);
   }

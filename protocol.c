@@ -42,7 +42,7 @@ int key_exchange(unsigned char *a_sk,
   
   b_epk = padded_array_make(b_epk_bytes, crypto_box_ZEROBYTES, crypto_box_PUBLICKEYBYTES);
   
-#define FAIL(err) { fprintf(stderr, "%s failure\n", err); close(sock); return EXIT_FAILURE; }
+#define FAIL(err) { fprintf(stderr, "%s failure\n", err); close(sock); return -1; }
   
   // 1. Alice and Bob generate new ephemeral keypairs
   crypto_box_keypair(a_epk.start, a_esk.start);
