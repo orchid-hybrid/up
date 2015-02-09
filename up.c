@@ -394,7 +394,8 @@ int main(int argc, char **argv) {
 
     strncpy(base, plain.start, 64);
 
-    printf("FILENAME IS %s\n", base);
+    filename = base;
+    printf("FILENAME IS %s\n", filename);
     
     // check if the file exists
     // if not create it with the given length
@@ -418,8 +419,13 @@ int main(int argc, char **argv) {
       
     }
     else {  // file does not exist
-      fptr = fopen(filename, "rw");
+      fptr = fopen(filename, "w");
+      if(!fptr) {
+        fprintf(stderr, "could not open file <%s>\n", filename);
+        return EXIT_FAILURE;
+      }
       ftruncate(fptr, length);
+      fseek(fptr, 0, SEEK_SET);
     }
     
     plain = plaintext_alloc(length);
@@ -427,8 +433,10 @@ int main(int argc, char **argv) {
     
     if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F4"); return EXIT_FAILURE; }
 
-    write_to_file("FILE.BIN", plain.start, plain.length);
+    fwrite(plain.start, plain.length, 1, fptr);
   }
+
+  close(sock);
   
   return EXIT_SUCCESS;
 }
