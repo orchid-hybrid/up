@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
+#include <libgen.h>
 
 #include <crypto_box.h>
 #include <crypto_secretbox.h>
@@ -14,6 +16,9 @@
 
 #define push_mode 0
 #define pull_mode 1
+
+#define MB(b) (1024*1024*b)
+#define BLOCKSIZE MB(4)
 
 #define CIPHERTEXT_LENGTH_A(l) (l + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES)
 #define CIPHERTEXT_LENGTH_S(l) (l + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES)
@@ -89,8 +94,9 @@ int main(int argc, char **argv) {
   char *contact_nick;
   
   char *filename;
-  FILE *fptr;
+  char *filename_base;
   long file_length;
+  FILE *fptr;
 
   conf *c;
 
@@ -162,6 +168,11 @@ int main(int argc, char **argv) {
     }
 
     filename = argv[5];
+    filename_base = basename(filename);
+    if(strlen(filename_base) > 64) {
+      puts("filename is too long! >64 characters");
+      return EXIT_FAILURE;
+    }
   }
   else if(send_mode == pull_mode) {
     if(argc != 1 + 4) {
@@ -200,14 +211,19 @@ int main(int argc, char **argv) {
   }
 
   if(send_mode == push_mode) {
-    // Check that the file we want to send exists
-    // get it's size, open it
+    struct stat buf;
+    if(stat(filename, &buf)) {
+      fprintf(stderr, "could not stat file <%s>\n", filename);
+      return EXIT_FAILURE;
+    }
 
-    // TODO
-
-    // for now just read entire file
-
-    //read_from_file();
+    file_length = buf.st_size;
+    
+    fptr = fopen(filename, "r");
+    if(!fptr) {
+      fprintf(stderr, "could not open file <%s>\n", filename);
+      return EXIT_FAILURE;
+    }
   }
   
   // we need to know our own secret key
@@ -330,15 +346,14 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
   
-  char *buffer;
   unsigned char network_length[4];
 
   padded_array plain = plaintext_alloc(4);
   padded_array cipher = ciphertext_alloc(4);
   
   if(send_mode == push_mode) {
-    read_from_file(filename, &buffer, &length);
-
+    length = file_length;
+    
     network_length[0] = length & 0xFF;
     network_length[1] = (length >> 8) & 0xFF;
     network_length[2] = (length >> 16) & 0xFF;
@@ -346,12 +361,19 @@ int main(int argc, char **argv) {
 
     memcpy(plain.start, network_length, 4);
     if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F1"); return EXIT_FAILURE; }
+    
+    plain = plaintext_alloc(64);
+    cipher = ciphertext_alloc(64);
 
+    strncpy(plain.start, filename_base, 64);
+    
+    if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F2"); return EXIT_FAILURE; }
+    
     plain = plaintext_alloc(length);
     cipher = ciphertext_alloc(length);
-
-    memcpy(plain.start, buffer, length);
-    if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F2"); return EXIT_FAILURE; }
+    
+    fread(plain.start, file_length, 1, fptr);
+    if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F3"); return EXIT_FAILURE; }
   }
   else if(send_mode == pull_mode) {
     if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F3"); return EXIT_FAILURE; }
@@ -363,6 +385,21 @@ int main(int argc, char **argv) {
     length |= network_length[2] << 16;
     length |= network_length[3] << 24;
 
+    plain = plaintext_alloc(64);
+    cipher = ciphertext_alloc(64);
+    
+    if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F3"); return EXIT_FAILURE; }
+
+    char base[65] = { 0 };
+
+    strncpy(base, plain.start, 64);
+
+    printf("FILENAME IS %s\n", base);
+    
+    // check if the file exists
+    // if not create it with the given length
+    // if not verify it has the correct length, if not bail out
+    
     plain = plaintext_alloc(length);
     cipher = ciphertext_alloc(length);
     
