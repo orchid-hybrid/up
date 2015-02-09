@@ -398,7 +398,29 @@ int main(int argc, char **argv) {
     
     // check if the file exists
     // if not create it with the given length
-    // if not verify it has the correct length, if not bail out
+    // if it exists, verify it has the correct length, if not bail out
+
+    struct stat buf;
+
+    if(!stat(filename, &buf)) {
+      file_length = buf.st_size;
+
+      if(file_length != length) {
+        fprintf(stderr, "incorrect size\n");
+        return EXIT_FAILURE;
+      }
+    
+      fptr = fopen(filename, "rw");
+      if(!fptr) {
+        fprintf(stderr, "could not open file <%s>\n", filename);
+        return EXIT_FAILURE;
+      }
+      
+    }
+    else {  // file does not exist
+      fptr = fopen(filename, "rw");
+      ftruncate(fptr, length);
+    }
     
     plain = plaintext_alloc(length);
     cipher = ciphertext_alloc(length);
