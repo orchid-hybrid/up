@@ -440,7 +440,7 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
       }
     
-      fptr = fopen(filename, "rw");
+      fptr = fopen(filename, "r+");
       if(!fptr) {
         fprintf(stderr, "could not open file <%s>\n", filename);
         return EXIT_FAILURE;
