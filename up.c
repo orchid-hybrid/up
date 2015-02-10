@@ -474,7 +474,7 @@ int main(int argc, char **argv) {
       fread(buffer, length, 1, fptr);
       crypto_hash(hash, buffer, length);
 
-      if(!(strncmp(hash, plain.start, crypto_hash_BYTES))) {
+      if(!(memcmp(hash, plain.start, crypto_hash_BYTES))) {
         response = HAVE;
         printf("succeeded hash check\n");
       }
