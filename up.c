@@ -400,7 +400,7 @@ int main(int argc, char **argv) {
       
       if(plain.start[0] == HAVE) {
         printf("got HAVE\n");
-        return EXIT_SUCCESS;
+        continue;
       }
       else if(plain.start[0] == GIVE) {
         printf("got GIVE\n");
@@ -475,7 +475,7 @@ int main(int argc, char **argv) {
           fprintf(stderr, "could not open file <%s>\n", filename);
           return EXIT_FAILURE;
         }
-        ftruncate(fptr, length);
+        ftruncate(fileno(fptr), length);
         fseek(fptr, 0, SEEK_SET);
 
         have_file = 0;
