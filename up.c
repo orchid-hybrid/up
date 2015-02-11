@@ -444,43 +444,43 @@ int main(int argc, char **argv) {
 
     fptr = NULL;
 
+    if(!stat(filename, &buf)) {
+      file_length = buf.st_size;
+
+      if(file_length != length) {
+        fprintf(stderr, "incorrect size (was %d, wanted %d)\n", file_length, length);
+        return EXIT_FAILURE;
+      }
+    
+      // file does exists, we open it for reading +writing
+      fptr = fopen(filename, "r+");
+      if(!fptr) {
+        fprintf(stderr, "could not open file <%s>\n", filename);
+        return EXIT_FAILURE;
+      }
+
+      have_file = 1;
+    }
+    else {
+      // file does not exist, we create it
+      fptr = fopen(filename, "w");
+      fseek(fptr, 0, SEEK_SET);
+
+      if(!fptr) {
+        fprintf(stderr, "could not open file <%s>\n", filename);
+        return EXIT_FAILURE;
+      }
+      ftruncate(fileno(fptr), length);
+      fseek(fptr, 0, SEEK_SET);
+      printf("created file of size %d\n", length);
+
+      have_file = 0;
+    }
+
     blocks = length/BLOCKSIZE;
     for(blockno = 0; blockno < blocks; blockno++) {
       printf("BLOCK [%d/%d]\n", blockno, blocks);
       
-      if(fptr) {
-        have_file = 1;
-      }
-      else if(!stat(filename, &buf)) {
-        file_length = buf.st_size;
-
-        if(file_length != length) {
-          fprintf(stderr, "incorrect size\n");
-          return EXIT_FAILURE;
-        }
-    
-        fptr = fopen(filename, "r+");
-        if(!fptr) {
-          fprintf(stderr, "could not open file <%s>\n", filename);
-          return EXIT_FAILURE;
-        }
-
-        have_file = 1;
-      }
-      else {  // file does not exist
-        fptr = fopen(filename, "a+");
-        fseek(fptr, 0, SEEK_SET);
-
-        if(!fptr) {
-          fprintf(stderr, "could not open file <%s>\n", filename);
-          return EXIT_FAILURE;
-        }
-        ftruncate(fileno(fptr), length);
-        fseek(fptr, 0, SEEK_SET);
-
-        have_file = 0;
-      }
-
       plain = plaintext_alloc(crypto_hash_BYTES);
       cipher = ciphertext_alloc(crypto_hash_BYTES);
 
@@ -495,17 +495,18 @@ int main(int argc, char **argv) {
         char *buffer = malloc(length);
         
         fread(buffer, BLOCKSIZE, 1, fptr);
-        fseek(fptr, pos, SEEK_SET);
         
         crypto_hash(hash, buffer, BLOCKSIZE);
 
         if(!(memcmp(hash, plain.start, crypto_hash_BYTES))) {
           response = HAVE;
-          printf("succeeded hash check\n");
+          printf("succeeded hash check, skipping\n");
         }
         else {
           response = GIVE;
-          printf("failed hash check\n");
+          fseek(fptr, pos, SEEK_SET);
+          
+          printf("failed hash check, asking for this piece\n");
         }
       }
       else {
@@ -521,8 +522,6 @@ int main(int argc, char **argv) {
 
       if(response == HAVE) {
         printf("had file!\n");
-
-        
         
         continue;
       }
