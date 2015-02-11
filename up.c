@@ -132,6 +132,9 @@ int main(int argc, char **argv) {
   padded_array ciphertext;
   
   unsigned char n[crypto_secretbox_NONCEBYTES] = { 0 };
+
+  long blocks;
+  long blockno;
   
   ////////////////////////////////
   // Argument parsing
@@ -360,6 +363,9 @@ int main(int argc, char **argv) {
   if(send_mode == push_mode) {
     length = file_length;
     
+    blocks = length/BLOCKSIZE;
+    blockno = 0;
+    
     network_length[0] = length & 0xFF;
     network_length[1] = (length >> 8) & 0xFF;
     network_length[2] = (length >> 16) & 0xFF;
@@ -375,32 +381,36 @@ int main(int argc, char **argv) {
     
     if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F2"); return EXIT_FAILURE; }
     
-    char *buffer = malloc(length);
-    fread(buffer, file_length, 1, fptr);
+    blocks = length/BLOCKSIZE;
+    for(blockno = 0; blockno < blocks; blockno++) {
+      printf("BLOCK [%d/%d]\n", blockno, blocks);
+      char *buffer = malloc(length);
+      fread(buffer, BLOCKSIZE, 1, fptr);
+      
+      plain = plaintext_alloc(crypto_hash_BYTES);
+      cipher = ciphertext_alloc(crypto_hash_BYTES);
+      
+      crypto_hash(plain.start, buffer, BLOCKSIZE);
+      if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F2.5"); return EXIT_FAILURE; }
     
-    plain = plaintext_alloc(crypto_hash_BYTES);
-    cipher = ciphertext_alloc(crypto_hash_BYTES);
-
-    crypto_hash(plain.start, buffer, length);
-    if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F2.5"); return EXIT_FAILURE; }
-    
-    plain = plaintext_alloc(1);
-    cipher = ciphertext_alloc(1);
-
-    recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key);
-
-    if(plain.start[0] == HAVE) {
-      printf("got HAVE\n");
-      return EXIT_SUCCESS;
-    }
-    else if(plain.start[0] == GIVE) {
-      printf("got GIVE\n");
-      plain = plaintext_alloc(length);
-      cipher = ciphertext_alloc(length);
-
-      memcpy(plain.start, buffer, length);
-
-      if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F3"); return EXIT_FAILURE; }
+      plain = plaintext_alloc(1);
+      cipher = ciphertext_alloc(1);
+      
+      recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key);
+      
+      if(plain.start[0] == HAVE) {
+        printf("got HAVE\n");
+        return EXIT_SUCCESS;
+      }
+      else if(plain.start[0] == GIVE) {
+        printf("got GIVE\n");
+        plain = plaintext_alloc(BLOCKSIZE);
+        cipher = ciphertext_alloc(BLOCKSIZE);
+        
+        memcpy(plain.start, buffer, BLOCKSIZE);
+        
+        if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F3"); return EXIT_FAILURE; }
+      }
     }
   }
   else if(send_mode == pull_mode) {
@@ -412,7 +422,7 @@ int main(int argc, char **argv) {
     length |= network_length[1] << 8;
     length |= network_length[2] << 16;
     length |= network_length[3] << 24;
-
+    
     plain = plaintext_alloc(64);
     cipher = ciphertext_alloc(64);
     
@@ -432,80 +442,98 @@ int main(int argc, char **argv) {
     struct stat buf;
     int have_file;
 
-    if(!stat(filename, &buf)) {
-      file_length = buf.st_size;
+    fptr = NULL;
 
-      if(file_length != length) {
-        fprintf(stderr, "incorrect size\n");
-        return EXIT_FAILURE;
+    blocks = length/BLOCKSIZE;
+    for(blockno = 0; blockno < blocks; blockno++) {
+      printf("BLOCK [%d/%d]\n", blockno, blocks);
+      
+      if(fptr) {
+        have_file = 1;
       }
+      else if(!stat(filename, &buf)) {
+        file_length = buf.st_size;
+
+        if(file_length != length) {
+          fprintf(stderr, "incorrect size\n");
+          return EXIT_FAILURE;
+        }
     
-      fptr = fopen(filename, "r+");
-      if(!fptr) {
-        fprintf(stderr, "could not open file <%s>\n", filename);
-        return EXIT_FAILURE;
+        fptr = fopen(filename, "r+");
+        if(!fptr) {
+          fprintf(stderr, "could not open file <%s>\n", filename);
+          return EXIT_FAILURE;
+        }
+
+        have_file = 1;
+      }
+      else {  // file does not exist
+        fptr = fopen(filename, "w");
+        if(!fptr) {
+          fprintf(stderr, "could not open file <%s>\n", filename);
+          return EXIT_FAILURE;
+        }
+        ftruncate(fptr, length);
+        fseek(fptr, 0, SEEK_SET);
+
+        have_file = 0;
       }
 
-      have_file = 1;
-    }
-    else {  // file does not exist
-      fptr = fopen(filename, "w");
-      if(!fptr) {
-        fprintf(stderr, "could not open file <%s>\n", filename);
-        return EXIT_FAILURE;
-      }
-      ftruncate(fptr, length);
-      fseek(fptr, 0, SEEK_SET);
+      plain = plaintext_alloc(crypto_hash_BYTES);
+      cipher = ciphertext_alloc(crypto_hash_BYTES);
 
-      have_file = 0;
-    }
+      if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F4"); return EXIT_FAILURE; }
 
-    plain = plaintext_alloc(crypto_hash_BYTES);
-    cipher = ciphertext_alloc(crypto_hash_BYTES);
+      char response;
+      
+      long pos = ftell(fptr);
+      
+      if(have_file) {
+        char hash[crypto_hash_BYTES];
+        char *buffer = malloc(length);
+        
+        fread(buffer, BLOCKSIZE, 1, fptr);
+        fseek(fptr, pos, SEEK_SET);
+        
+        crypto_hash(hash, buffer, BLOCKSIZE);
 
-    if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F4"); return EXIT_FAILURE; }
-
-    char response;
-
-    if(have_file) {
-      char hash[crypto_hash_BYTES];
-      char *buffer = malloc(length);
-
-      fread(buffer, length, 1, fptr);
-      crypto_hash(hash, buffer, length);
-
-      if(!(memcmp(hash, plain.start, crypto_hash_BYTES))) {
-        response = HAVE;
-        printf("succeeded hash check\n");
+        if(!(memcmp(hash, plain.start, crypto_hash_BYTES))) {
+          response = HAVE;
+          printf("succeeded hash check\n");
+        }
+        else {
+          response = GIVE;
+          printf("failed hash check\n");
+        }
       }
       else {
         response = GIVE;
-        printf("failed hash check\n");
       }
-    }
-    else {
-      response = GIVE;
-    }
 
-    plain = plaintext_alloc(1);
-    cipher = ciphertext_alloc(1);
+      plain = plaintext_alloc(1);
+      cipher = ciphertext_alloc(1);
 
-    plain.start[0] = response;
+      plain.start[0] = response;
 
-    send_e(sock, 0, &plain, &cipher, n, key);
+      send_e(sock, 0, &plain, &cipher, n, key);
 
-    if(response == HAVE) {
-      printf("had file!\n");
-      return EXIT_SUCCESS;
-    }
+      if(response == HAVE) {
+        printf("had file!\n");
+
+        
+        
+        continue;
+      }
+      
+      plain = plaintext_alloc(BLOCKSIZE);
+      cipher = ciphertext_alloc(BLOCKSIZE);
     
-    plain = plaintext_alloc(length);
-    cipher = ciphertext_alloc(length);
-    
-    if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F4"); return EXIT_FAILURE; }
+      if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F4"); return EXIT_FAILURE; }
 
-    fseek(fptr, 0, SEEK_SET);
-    fwrite(plain.start, plain.length, 1, fptr);
+      //fseek(fptr, 0, SEEK_SET);
+      fseek(fptr, pos, SEEK_SET);
+      fwrite(plain.start, plain.length, 1, fptr);
+    }
   }
 
   close(sock);
