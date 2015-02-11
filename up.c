@@ -359,6 +359,8 @@ int main(int argc, char **argv) {
 
   padded_array plain = plaintext_alloc(4);
   padded_array cipher = ciphertext_alloc(4);
+
+  int size;
   
   if(send_mode == push_mode) {
     length = file_length;
@@ -382,15 +384,17 @@ int main(int argc, char **argv) {
     if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F2"); return EXIT_FAILURE; }
     
     blocks = length/BLOCKSIZE;
-    for(blockno = 0; blockno < blocks; blockno++) {
+    for(blockno = 0; blockno <= blocks; blockno++) {
+      size = blockno == blocks ? length - (BLOCKSIZE * blocks - 1) - 1 : BLOCKSIZE;
+
       printf("BLOCK [%d/%d]\n", blockno, blocks);
       char *buffer = malloc(length);
-      fread(buffer, BLOCKSIZE, 1, fptr);
+      fread(buffer, size, 1, fptr);
       
       plain = plaintext_alloc(crypto_hash_BYTES);
       cipher = ciphertext_alloc(crypto_hash_BYTES);
       
-      crypto_hash(plain.start, buffer, BLOCKSIZE);
+      crypto_hash(plain.start, buffer, size);
       if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F2.5"); return EXIT_FAILURE; }
     
       plain = plaintext_alloc(1);
@@ -404,10 +408,10 @@ int main(int argc, char **argv) {
       }
       else if(plain.start[0] == GIVE) {
         printf("got GIVE\n");
-        plain = plaintext_alloc(BLOCKSIZE);
-        cipher = ciphertext_alloc(BLOCKSIZE);
+        plain = plaintext_alloc(size);
+        cipher = ciphertext_alloc(size);
         
-        memcpy(plain.start, buffer, BLOCKSIZE);
+        memcpy(plain.start, buffer, size);
         
         if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F3"); return EXIT_FAILURE; }
       }
@@ -478,7 +482,9 @@ int main(int argc, char **argv) {
     }
 
     blocks = length/BLOCKSIZE;
-    for(blockno = 0; blockno < blocks; blockno++) {
+    for(blockno = 0; blockno <= blocks; blockno++) {
+      size = blockno == blocks ? length - (BLOCKSIZE * blocks - 1) - 1 : BLOCKSIZE;
+
       printf("BLOCK [%d/%d]\n", blockno, blocks);
       
       plain = plaintext_alloc(crypto_hash_BYTES);
@@ -526,8 +532,8 @@ int main(int argc, char **argv) {
         continue;
       }
       
-      plain = plaintext_alloc(BLOCKSIZE);
-      cipher = ciphertext_alloc(BLOCKSIZE);
+      plain = plaintext_alloc(size);
+      cipher = ciphertext_alloc(size);
     
       if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F4"); return EXIT_FAILURE; }
 
