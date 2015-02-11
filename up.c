@@ -468,7 +468,9 @@ int main(int argc, char **argv) {
         have_file = 1;
       }
       else {  // file does not exist
-        fptr = fopen(filename, "w");
+        fptr = fopen(filename, "a+");
+        fseek(fptr, 0, SEEK_SET);
+
         if(!fptr) {
           fprintf(stderr, "could not open file <%s>\n", filename);
           return EXIT_FAILURE;
