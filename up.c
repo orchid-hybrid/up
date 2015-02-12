@@ -178,8 +178,8 @@ int main(int argc, char **argv) {
 
     filename = argv[5];
     filename_base = basename(filename);
-    if(strlen(filename_base) > 64) {
-      puts("filename is too long! >64 characters");
+    if(strlen(filename_base) > 512) {
+      puts("filename is too long! >512 characters");
       return EXIT_FAILURE;
     }
   }
@@ -376,10 +376,10 @@ int main(int argc, char **argv) {
     memcpy(plain.start, network_length, 4);
     if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F1"); return EXIT_FAILURE; }
     
-    plain = plaintext_alloc(64);
-    cipher = ciphertext_alloc(64);
+    plain = plaintext_alloc(512);
+    cipher = ciphertext_alloc(512);
 
-    strncpy(plain.start, filename_base, 64);
+    strncpy(plain.start, filename_base, 512);
     
     if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F2"); return EXIT_FAILURE; }
     
@@ -427,14 +427,14 @@ int main(int argc, char **argv) {
     length |= network_length[2] << 16;
     length |= network_length[3] << 24;
     
-    plain = plaintext_alloc(64);
-    cipher = ciphertext_alloc(64);
+    plain = plaintext_alloc(512);
+    cipher = ciphertext_alloc(512);
     
     if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F3"); return EXIT_FAILURE; }
 
-    char base[65] = { 0 };
+    char base[513] = { 0 };
 
-    strncpy(base, plain.start, 64);
+    strncpy(base, plain.start, 512);
 
     filename = base;
     printf("FILENAME IS %s\n", filename);
