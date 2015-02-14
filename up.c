@@ -500,9 +500,9 @@ int main(int argc, char **argv) {
         char hash[crypto_hash_BYTES];
         char *buffer = malloc(length);
         
-        fread(buffer, BLOCKSIZE, 1, fptr);
+        fread(buffer, size, 1, fptr);
         
-        crypto_hash(hash, buffer, BLOCKSIZE);
+        crypto_hash(hash, buffer, size);
 
         if(!(memcmp(hash, plain.start, crypto_hash_BYTES))) {
           response = HAVE;
