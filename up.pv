@@ -1,0 +1,91 @@
+(** crypto_box: http://nacl.cr.yp.to/box.html **)
+
+type sk.
+type pk.
+
+(* pk = crypto_box_keypair(sk) *)
+
+fun crypto_box_keypair(sk):pk.
+
+(* c = crypto_box(m,n,pk,sk) *)
+
+fun crypto_box(bitstring,bitstring,pk,sk):bitstring.
+
+(* m = crypto_box_open(c,n,pk,sk) *)
+
+fun crypto_box_open(bitstring,bitstring,pk,sk):bitstring.
+
+equation forall m:bitstring, n:bitstring, bobsec:sk, alicesec:sk; crypto_box_open(crypto_box(m,n,crypto_box_keypair(bobsec),alicesec),n,crypto_box_keypair(bobsec),alicesec) = m.
+equation forall m:bitstring, n:bitstring, bobsec:sk, alicesec:sk; crypto_box_open(crypto_box(m,n,crypto_box_keypair(bobsec),alicesec),n,crypto_box_keypair(alicesec),bobsec) = m.
+
+
+
+(** Protocol A2 **)
+
+type key.
+
+fun serialize_pk(pk):bitstring [data,typeConverter].
+
+free n0:bitstring. (* we use a constant nonce *)
+
+free asecret:bitstring [private].
+free bsecret:bitstring [private].
+
+query attacker(asecret).
+
+free c:channel.
+
+let clientA(mykey:sk,theirkey:pk,mysecret:bitstring) =
+ new ephsec:sk;
+ let ephpub = crypto_box_keypair(ephsec) in
+
+ (*
+ new n:bitstring;
+ out(c, crypto_box(n0,n,theirkey,mykey));*)
+ let n = n0 in
+ out(c, n);
+ 
+ out(c, crypto_box(serialize_pk(ephpub),n,theirkey,mykey));
+ in(c, enc:bitstring);
+ let serialize_pk(theireph) = crypto_box_open(enc,n,theirkey,mykey) in
+ out(c, crypto_box(mysecret,n,theireph,ephsec));
+(* if theireph = theirkey then
+  0
+ else*)
+  in(c, enc2:bitstring);
+  let theirsecret = crypto_box_open(enc2,n,theireph,ephsec) in
+ 
+  out(c, mykey).
+
+
+let clientB(mykey:sk,theirkey:pk,mysecret:bitstring) =
+ new ephsec:sk;
+ let ephpub = crypto_box_keypair(ephsec) in
+
+ (*
+ in(c, encn:bitstring);
+ let n = crypto_box_open(encn,n0,theirkey,mykey) in
+ *)
+ in(c, n:bitstring);
+ 
+ in(c, enc:bitstring);
+ out(c, crypto_box(serialize_pk(ephpub),n,theirkey,mykey));
+ let serialize_pk(theireph) = crypto_box_open(enc,n,theirkey,mykey) in
+ in(c, enc2:bitstring);
+ out(c, crypto_box(mysecret,n,theireph,ephsec));
+(* if theireph = theirkey then
+  0
+ else*)
+  let theirsecret = crypto_box_open(enc2,n,theireph,ephsec) in
+ 
+  out(c, mykey).
+  
+let go =
+ new alicesec:sk;
+ new bobsec:sk;
+ ( clientA(alicesec, crypto_box_keypair(bobsec), asecret)
+ | clientB(bobsec, crypto_box_keypair(alicesec), bsecret)
+ ).
+
+process
+ !go
