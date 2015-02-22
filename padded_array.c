@@ -13,6 +13,7 @@ padded_array padded_array_make(unsigned char *b, int p, int s) {
   a.length = s;
   a.bytes = b;
   a.start = b + p;
+  memset(b, 0x00, p);
   return a;
 }
 
