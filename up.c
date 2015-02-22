@@ -44,12 +44,12 @@ void usage() {
        );
 }
 
-padded_array plaintext_alloc(int s) {
-  return padded_array_alloc(crypto_secretbox_ZEROBYTES, s);
+padded_array plaintext_create_using(unsigned char *b, int s) {
+  return padded_array_make(b, crypto_secretbox_ZEROBYTES, s);
 }
 
-padded_array ciphertext_alloc(int s) {
-  return padded_array_alloc(crypto_secretbox_BOXZEROBYTES, s + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES);
+padded_array ciphertext_create_using(unsigned char *b, int s) {
+  return padded_array_make(b, crypto_secretbox_BOXZEROBYTES, s + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES);
 }
 
 int send_e(int sock,
@@ -135,6 +135,15 @@ int main(int argc, char **argv) {
 
   long blocks;
   long blockno;
+
+  unsigned char block_plain_bytes[crypto_secretbox_ZEROBYTES + BLOCKSIZE];
+  unsigned char block_cipher_bytes[crypto_secretbox_BOXZEROBYTES + BLOCKSIZE];
+
+  padded_array plain = padded_array_make(block_plain_bytes, crypto_secretbox_ZEROBYTES, BLOCKSIZE);
+  padded_array cipher = padded_array_make(block_cipher_bytes, crypto_secretbox_BOXZEROBYTES, BLOCKSIZE + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES);
+
+  int size;
+  unsigned char network_length[4];
   
   ////////////////////////////////
   // Argument parsing
@@ -355,13 +364,6 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
   
-  unsigned char network_length[4];
-
-  padded_array plain = plaintext_alloc(4);
-  padded_array cipher = ciphertext_alloc(4);
-
-  int size;
-  
   if(send_mode == push_mode) {
     length = file_length;
     
@@ -376,8 +378,8 @@ int main(int argc, char **argv) {
     memcpy(plain.start, network_length, 4);
     if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F1"); return EXIT_FAILURE; }
     
-    plain = plaintext_alloc(512);
-    cipher = ciphertext_alloc(512);
+    plain = plaintext_create_using(plain.bytes, 512);
+    cipher = ciphertext_create_using(cipher.bytes, 512);
 
     strncpy(plain.start, filename_base, 512);
     
@@ -391,27 +393,30 @@ int main(int argc, char **argv) {
       char *buffer = malloc(length);
       fread(buffer, size, 1, fptr);
       
-      plain = plaintext_alloc(crypto_hash_BYTES);
-      cipher = ciphertext_alloc(crypto_hash_BYTES);
+      plain = plaintext_create_using(plain.bytes, crypto_hash_BYTES);
+      cipher = ciphertext_create_using(cipher.bytes, crypto_hash_BYTES);
       
       crypto_hash(plain.start, buffer, size);
       if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F2.5"); return EXIT_FAILURE; }
     
-      plain = plaintext_alloc(1);
-      cipher = ciphertext_alloc(1);
+      plain = plaintext_create_using(plain.bytes, 1);
+      cipher = ciphertext_create_using(cipher.bytes, 1);
       
       recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key);
       
       if(plain.start[0] == HAVE) {
         printf("got HAVE\n");
+
+        free(buffer);
         continue;
       }
       else if(plain.start[0] == GIVE) {
         printf("got GIVE\n");
-        plain = plaintext_alloc(size);
-        cipher = ciphertext_alloc(size);
+        plain = plaintext_create_using(plain.bytes, size);
+        cipher = ciphertext_create_using(cipher.bytes, size);
         
         memcpy(plain.start, buffer, size);
+        free(buffer);
         
         if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F3"); return EXIT_FAILURE; }
       }
@@ -427,8 +432,8 @@ int main(int argc, char **argv) {
     length |= network_length[2] << 16;
     length |= network_length[3] << 24;
     
-    plain = plaintext_alloc(512);
-    cipher = ciphertext_alloc(512);
+    plain = plaintext_create_using(plain.bytes, 512);
+    cipher = ciphertext_create_using(cipher.bytes, 512);
     
     if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F3"); return EXIT_FAILURE; }
 
@@ -487,8 +492,8 @@ int main(int argc, char **argv) {
 
       printf("BLOCK [%d/%d]\n", blockno, blocks);
       
-      plain = plaintext_alloc(crypto_hash_BYTES);
-      cipher = ciphertext_alloc(crypto_hash_BYTES);
+      plain = plaintext_create_using(plain.bytes, crypto_hash_BYTES);
+      cipher = ciphertext_create_using(cipher.bytes, crypto_hash_BYTES);
 
       if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F4"); return EXIT_FAILURE; }
 
@@ -503,6 +508,7 @@ int main(int argc, char **argv) {
         fread(buffer, size, 1, fptr);
         
         crypto_hash(hash, buffer, size);
+        free(buffer);
 
         if(!(memcmp(hash, plain.start, crypto_hash_BYTES))) {
           response = HAVE;
@@ -519,8 +525,8 @@ int main(int argc, char **argv) {
         response = GIVE;
       }
 
-      plain = plaintext_alloc(1);
-      cipher = ciphertext_alloc(1);
+      plain = plaintext_create_using(plain.bytes, 1);
+      cipher = ciphertext_create_using(cipher.bytes, 1);
 
       plain.start[0] = response;
 
@@ -532,8 +538,8 @@ int main(int argc, char **argv) {
         continue;
       }
       
-      plain = plaintext_alloc(size);
-      cipher = ciphertext_alloc(size);
+      plain = plaintext_create_using(plain.bytes, size);
+      cipher = ciphertext_create_using(cipher.bytes, size);
     
       if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F4"); return EXIT_FAILURE; }
 
