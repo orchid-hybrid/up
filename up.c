@@ -53,20 +53,20 @@ padded_array ciphertext_create_using(unsigned char *b, int s) {
 }
 
 int send_e(int sock,
-            int flags,
-            // plaintext, padding must be cypto_secretbox_ZEROBYTES
-            padded_array *p,
-            // ciphertext, padding must be crypto_secretbox_BOXZEROBYTES
-            padded_array *c,
-            unsigned char *n,
-            unsigned char *key) {
+           int flags,
+           // plaintext, padding must be cypto_secretbox_ZEROBYTES
+           padded_array *p,
+           // ciphertext, padding must be crypto_secretbox_BOXZEROBYTES
+           padded_array *c,
+           unsigned char *n,
+           unsigned char *key) {
   if (crypto_secretbox(c->bytes,
                        p->bytes,
                        p->padded_length, n, key)) {
     puts("crypto_secretbox failed in send!");
     return -1;
   }
-
+  
   increment_nonce(n, crypto_secretbox_NONCEBYTES);
   sendall(sock, c->start, c->length);
   return 0;
@@ -136,11 +136,11 @@ int main(int argc, char **argv) {
   long blocks;
   long blockno;
 
-  unsigned char block_plain_bytes[crypto_secretbox_ZEROBYTES + BLOCKSIZE];
-  unsigned char block_cipher_bytes[crypto_secretbox_BOXZEROBYTES + BLOCKSIZE];
-
-  padded_array plain = padded_array_make(block_plain_bytes, crypto_secretbox_ZEROBYTES, BLOCKSIZE);
-  padded_array cipher = padded_array_make(block_cipher_bytes, crypto_secretbox_BOXZEROBYTES, BLOCKSIZE + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES);
+  unsigned char *block_plain_bytes = malloc(crypto_secretbox_ZEROBYTES + BLOCKSIZE);
+  unsigned char *block_cipher_bytes = malloc(crypto_secretbox_BOXZEROBYTES + BLOCKSIZE);
+  
+  padded_array plain = plaintext_create_using(block_plain_bytes, BLOCKSIZE);
+  padded_array cipher = ciphertext_create_using(block_cipher_bytes, BLOCKSIZE);
 
   int size;
   unsigned char network_length[4];
@@ -148,7 +148,7 @@ int main(int argc, char **argv) {
   ////////////////////////////////
   // Argument parsing
 
-  if(argc != 1 + 4 && argc != 1 + 5) {
+  if((argc != 1 + 4) && (argc != 1 + 5)) {
     usage();
     return EXIT_FAILURE;
   }
@@ -364,8 +364,8 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
   
-  plain = plaintext_create_using(plain.bytes, 4);
-  cipher = ciphertext_create_using(cipher.bytes, 4);
+  plain = plaintext_create_using(block_plain_bytes, 4);
+  cipher = ciphertext_create_using(block_cipher_bytes, 4);
   
   if(send_mode == push_mode) {
     length = file_length;
@@ -381,8 +381,8 @@ int main(int argc, char **argv) {
     memcpy(plain.start, network_length, 4);
     if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F1"); return EXIT_FAILURE; }
     
-    plain = plaintext_create_using(plain.bytes, 512);
-    cipher = ciphertext_create_using(cipher.bytes, 512);
+    plain = plaintext_create_using(block_plain_bytes, 512);
+    cipher = ciphertext_create_using(block_cipher_bytes, 512);
 
     strncpy(plain.start, filename_base, 512);
     
@@ -396,14 +396,14 @@ int main(int argc, char **argv) {
       char *buffer = malloc(length);
       fread(buffer, size, 1, fptr);
       
-      plain = plaintext_create_using(plain.bytes, crypto_hash_BYTES);
-      cipher = ciphertext_create_using(cipher.bytes, crypto_hash_BYTES);
+      plain = plaintext_create_using(block_plain_bytes, crypto_hash_BYTES);
+      cipher = ciphertext_create_using(block_cipher_bytes, crypto_hash_BYTES);
       
       crypto_hash(plain.start, buffer, size);
       if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F2.5"); return EXIT_FAILURE; }
     
-      plain = plaintext_create_using(plain.bytes, 1);
-      cipher = ciphertext_create_using(cipher.bytes, 1);
+      plain = plaintext_create_using(block_plain_bytes, 1);
+      cipher = ciphertext_create_using(block_cipher_bytes, 1);
       
       recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key);
       
@@ -415,8 +415,8 @@ int main(int argc, char **argv) {
       }
       else if(plain.start[0] == GIVE) {
         printf("got GIVE\n");
-        plain = plaintext_create_using(plain.bytes, size);
-        cipher = ciphertext_create_using(cipher.bytes, size);
+        plain = plaintext_create_using(block_plain_bytes, size);
+        cipher = ciphertext_create_using(block_cipher_bytes, size);
         
         memcpy(plain.start, buffer, size);
         free(buffer);
@@ -435,8 +435,8 @@ int main(int argc, char **argv) {
     length |= network_length[2] << 16;
     length |= network_length[3] << 24;
     
-    plain = plaintext_create_using(plain.bytes, 512);
-    cipher = ciphertext_create_using(cipher.bytes, 512);
+    plain = plaintext_create_using(block_plain_bytes, 512);
+    cipher = ciphertext_create_using(block_cipher_bytes, 512);
     
     if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F3"); return EXIT_FAILURE; }
 
@@ -495,8 +495,8 @@ int main(int argc, char **argv) {
 
       printf("BLOCK [%d/%d]\n", blockno, blocks);
       
-      plain = plaintext_create_using(plain.bytes, crypto_hash_BYTES);
-      cipher = ciphertext_create_using(cipher.bytes, crypto_hash_BYTES);
+      plain = plaintext_create_using(block_plain_bytes, crypto_hash_BYTES);
+      cipher = ciphertext_create_using(block_cipher_bytes, crypto_hash_BYTES);
 
       if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F4"); return EXIT_FAILURE; }
 
@@ -528,8 +528,8 @@ int main(int argc, char **argv) {
         response = GIVE;
       }
 
-      plain = plaintext_create_using(plain.bytes, 1);
-      cipher = ciphertext_create_using(cipher.bytes, 1);
+      plain = plaintext_create_using(block_plain_bytes, 1);
+      cipher = ciphertext_create_using(block_cipher_bytes, 1);
 
       plain.start[0] = response;
 
@@ -541,8 +541,8 @@ int main(int argc, char **argv) {
         continue;
       }
       
-      plain = plaintext_create_using(plain.bytes, size);
-      cipher = ciphertext_create_using(cipher.bytes, size);
+      plain = plaintext_create_using(block_plain_bytes, size);
+      cipher = ciphertext_create_using(block_cipher_bytes, size);
     
       if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F4"); return EXIT_FAILURE; }
 
