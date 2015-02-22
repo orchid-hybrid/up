@@ -364,6 +364,9 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
   
+  plain = plaintext_create_using(plain.bytes, 4);
+  cipher = ciphertext_create_using(cipher.bytes, 4);
+  
   if(send_mode == push_mode) {
     length = file_length;
     
