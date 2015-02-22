@@ -137,7 +137,7 @@ int main(int argc, char **argv) {
   long blockno;
 
   unsigned char *block_plain_bytes = malloc(crypto_secretbox_ZEROBYTES + BLOCKSIZE);
-  unsigned char *block_cipher_bytes = malloc(crypto_secretbox_BOXZEROBYTES + BLOCKSIZE);
+  unsigned char *block_cipher_bytes = malloc(crypto_secretbox_ZEROBYTES + BLOCKSIZE);
   
   padded_array plain = plaintext_create_using(block_plain_bytes, BLOCKSIZE);
   padded_array cipher = ciphertext_create_using(block_cipher_bytes, BLOCKSIZE);
@@ -367,6 +367,7 @@ int main(int argc, char **argv) {
   plain = plaintext_create_using(block_plain_bytes, 4);
   cipher = ciphertext_create_using(block_cipher_bytes, 4);
   
+  char *buffer = malloc(BLOCKSIZE);
   if(send_mode == push_mode) {
     length = file_length;
     
@@ -393,7 +394,6 @@ int main(int argc, char **argv) {
       size = blockno == blocks ? length - (BLOCKSIZE * blocks - 1) - 1 : BLOCKSIZE;
 
       printf("BLOCK [%d/%d]\n", blockno, blocks);
-      char *buffer = malloc(length);
       fread(buffer, size, 1, fptr);
       
       plain = plaintext_create_using(block_plain_bytes, crypto_hash_BYTES);
@@ -410,7 +410,6 @@ int main(int argc, char **argv) {
       if(plain.start[0] == HAVE) {
         printf("got HAVE\n");
 
-        free(buffer);
         continue;
       }
       else if(plain.start[0] == GIVE) {
@@ -419,7 +418,6 @@ int main(int argc, char **argv) {
         cipher = ciphertext_create_using(block_cipher_bytes, size);
         
         memcpy(plain.start, buffer, size);
-        free(buffer);
         
         if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F3"); return EXIT_FAILURE; }
       }
@@ -506,12 +504,10 @@ int main(int argc, char **argv) {
       
       if(have_file) {
         char hash[crypto_hash_BYTES];
-        char *buffer = malloc(length);
         
         fread(buffer, size, 1, fptr);
         
         crypto_hash(hash, buffer, size);
-        free(buffer);
 
         if(!(memcmp(hash, plain.start, crypto_hash_BYTES))) {
           response = HAVE;

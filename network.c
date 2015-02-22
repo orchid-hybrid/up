@@ -49,6 +49,9 @@ int start_networking(int mode, char *hostname, char *port, int *sock_out) {
       return 0;
     }
     else if (mode == server_mode) {
+      int optval = 1;
+      setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval);
+      
       if (!bind(sock, p->ai_addr, p->ai_addrlen)) {
         // should now listen until it gets a connection
 
