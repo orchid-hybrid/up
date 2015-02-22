@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,6 +25,18 @@
 #define CIPHERTEXT_LENGTH_A(l) (l + crypto_box_ZEROBYTES - crypto_box_BOXZEROBYTES)
 #define CIPHERTEXT_LENGTH_S(l) (l + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES)
 #define FAIL(err) { fprintf(stderr, "%s failure\n", err); close(sock); return EXIT_FAILURE; }
+
+// m is the maximum size of the padded array, to make sure we don't go over
+void change_length(padded_array p, padded_array c, int l, int m) {
+  assert(l <= m);
+
+  p.length = l;
+  p.padded_length = l + crypto_secretbox_ZEROBYTES;
+
+  c.length = l + crypto_secretbox_ZEROBYTES
+               - crypto_secretbox_BOXZEROBYTES;
+  c.padded_length = c.length + crypto_secretbox_BOXZEROBYTES;
+}
 
 typedef enum {
   HAVE = 0,
@@ -135,6 +148,16 @@ int main(int argc, char **argv) {
 
   long blocks;
   long blockno;
+
+  unsigned char block_plain_bytes[crypto_secretbox_ZEROBYTES + BLOCKSIZE];
+  unsigned char block_cipher_bytes[crypto_secretbox_BOXZEROBYTES + BLOCKSIZE];
+
+  padded_array plain = padded_array_make(block_plain_bytes, crypto_secretbox_ZEROBYTES, BLOCKSIZE);
+  padded_array cipher = padded_array_make(block_cipher_bytes, crypto_secretbox_BOXZEROBYTES, BLOCKSIZE + crypto_secretbox_ZEROBYTES - crypto_secretbox_BOXZEROBYTES);
+
+  int size;
+  
+  unsigned char network_length[4];
   
   ////////////////////////////////
   // Argument parsing
@@ -355,13 +378,6 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
   
-  unsigned char network_length[4];
-
-  padded_array plain = plaintext_alloc(4);
-  padded_array cipher = ciphertext_alloc(4);
-
-  int size;
-  
   if(send_mode == push_mode) {
     length = file_length;
     
@@ -376,8 +392,7 @@ int main(int argc, char **argv) {
     memcpy(plain.start, network_length, 4);
     if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F1"); return EXIT_FAILURE; }
     
-    plain = plaintext_alloc(512);
-    cipher = ciphertext_alloc(512);
+    change_length(plain, cipher, 512, BLOCKSIZE);
 
     strncpy(plain.start, filename_base, 512);
     
@@ -388,17 +403,17 @@ int main(int argc, char **argv) {
       size = blockno == blocks ? length - (BLOCKSIZE * blocks - 1) - 1 : BLOCKSIZE;
 
       printf("BLOCK [%d/%d]\n", blockno, blocks);
+
       char *buffer = malloc(length);
       fread(buffer, size, 1, fptr);
-      
-      plain = plaintext_alloc(crypto_hash_BYTES);
-      cipher = ciphertext_alloc(crypto_hash_BYTES);
-      
+
+      change_length(plain, cipher, crypto_hash_BYTES, BLOCKSIZE);
+            
       crypto_hash(plain.start, buffer, size);
+
       if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F2.5"); return EXIT_FAILURE; }
     
-      plain = plaintext_alloc(1);
-      cipher = ciphertext_alloc(1);
+      change_length(plain, cipher, 1, BLOCKSIZE);
       
       recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key);
       
@@ -408,10 +423,11 @@ int main(int argc, char **argv) {
       }
       else if(plain.start[0] == GIVE) {
         printf("got GIVE\n");
-        plain = plaintext_alloc(size);
-        cipher = ciphertext_alloc(size);
+
+        change_length(plain, cipher, size, BLOCKSIZE);
         
         memcpy(plain.start, buffer, size);
+        free(buffer);
         
         if(send_e(sock, 0, &plain, &cipher, n, key)) { puts("F3"); return EXIT_FAILURE; }
       }
@@ -427,8 +443,7 @@ int main(int argc, char **argv) {
     length |= network_length[2] << 16;
     length |= network_length[3] << 24;
     
-    plain = plaintext_alloc(512);
-    cipher = ciphertext_alloc(512);
+    change_length(plain, cipher, 512, BLOCKSIZE);
     
     if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F3"); return EXIT_FAILURE; }
 
@@ -486,9 +501,8 @@ int main(int argc, char **argv) {
       size = blockno == blocks ? length - (BLOCKSIZE * blocks - 1) - 1 : BLOCKSIZE;
 
       printf("BLOCK [%d/%d]\n", blockno, blocks);
-      
-      plain = plaintext_alloc(crypto_hash_BYTES);
-      cipher = ciphertext_alloc(crypto_hash_BYTES);
+
+      change_length(plain, cipher, crypto_hash_BYTES, BLOCKSIZE);
 
       if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F4"); return EXIT_FAILURE; }
 
@@ -503,6 +517,7 @@ int main(int argc, char **argv) {
         fread(buffer, size, 1, fptr);
         
         crypto_hash(hash, buffer, size);
+        free(buffer);
 
         if(!(memcmp(hash, plain.start, crypto_hash_BYTES))) {
           response = HAVE;
@@ -519,8 +534,7 @@ int main(int argc, char **argv) {
         response = GIVE;
       }
 
-      plain = plaintext_alloc(1);
-      cipher = ciphertext_alloc(1);
+      change_length(plain, cipher, 1, BLOCKSIZE);
 
       plain.start[0] = response;
 
@@ -531,9 +545,8 @@ int main(int argc, char **argv) {
         
         continue;
       }
-      
-      plain = plaintext_alloc(size);
-      cipher = ciphertext_alloc(size);
+
+      change_length(plain, cipher, size, BLOCKSIZE);
     
       if(recv_e(sock, MSG_WAITALL, &plain, &cipher, n, key)) { puts("F4"); return EXIT_FAILURE; }
 
