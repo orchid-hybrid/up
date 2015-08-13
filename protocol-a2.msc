@@ -1,0 +1,41 @@
+hscale="2.0";
+
+# https://sverweij.github.io/mscgen_js/index.html
+
+Alice, Bob;
+
+--- : 1. Generate ephemeral keypairs;
+Alice box Alice : Alice(eph) <- generate keypair,
+Bob box Bob : Bob(eph) <- generate keypair;
+|||;
+--- : 2. Encrypt ephemeral keys with private keys;
+Alice box Alice : Am1 <- encrypt Alice(eph).pub to Bob from Alice,
+Bob box Bob : Bm1 <- encrypt Bob(eph).pub to Alice from Bob;
+|||;
+--- : 3. Exchange encrypted ephemeral keys;
+Alice => Bob : Am1;
+Bob => Alice : Bm1;
+|||;
+--- : 4. Generate symmetric key parts;
+Alice box Alice : Ak <- generate key,
+Bob box Bob : Bk <- generate key;
+|||;
+--- : 5. Encrypt key parts with ephemeral keys and exchange them;
+Alice box Alice : Am2 <- encrypt Ak to Bob(eph) from Alice(eph),
+Bob box Bob : Bm2 <- encrypt Bk to Alice(eph) from Bob(eph);
+|||;
+Alice => Bob : Am2;
+Bob => Alice : Bm2;
+|||;
+--- : 6. Decrypt keyparts;
+Alice box Alice : Bk <- decrypt Bm2,
+Bob box Bob : Ak <- decrypt Am2;
+|||;
+--- : 7. Compute the symmetric key;
+Alice box Alice : k <- xor Ak Bk,
+Bob box Bob : k <- xor Ak Bk;
+|||;
+--- : 8. Erase ephemeral keys;
+Alice box Alice : erase Alice(eph),
+Bob box Bob : erase Bob(eph);
+|||;
