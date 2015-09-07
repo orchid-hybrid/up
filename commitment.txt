@@ -1,0 +1,5 @@
+For a party to commit to a message they should randomly generate a key then publish `H(key || public key || message)`. (In our case all 3 of those strings are of a fixed length, so we don't need to worry about length extension attacks).
+
+Later they can reveal the message and key for anyone else to be able to verify it.
+
+The identity of the person commiting is included to protect against replay attacks.
