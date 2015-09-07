@@ -1,0 +1,9 @@
+There was a minor problem with protocol a2:
+
+Bob's client gets Alices key part before sending his own - if he had a backdoored/malicious client it could compute a keypart that results in any particular shared secret (e.g. a weak one known to an attacker).
+
+A solution to this is that alice and bob both commit their keypart before revealing. This adds two extra messages to the handshake.
+
+Since the commit is a hash that no information can be read from before the reveal it could be possible to include it - in plaintext - in the first messages (keeping the protocol down to 4 messages). A slight problem with this is that the security of the protocol can be broken if the hash used in the commitment scheme is broken - if we use 6 messages the protocol should only be broken if pub/priv key encryption is broken.
+
+Of course a backdoored client could simply post the key to the attacker (but this would be detectable in theory by monitoring what connections are being made/firewalling) or attempt to leak it via timing. Despite this I feel like the security in increased by stopping Bob having full control over the secret - that would allow passive captures to be decrypted easily.
