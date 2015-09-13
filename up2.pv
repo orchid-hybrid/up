@@ -1,0 +1,97 @@
+(** crypto_box: http://nacl.cr.yp.to/box.html **)
+(* nonces removed *)
+
+type sk.
+type pk.
+fun serialize_pk(pk):bitstring [data,typeConverter].
+
+(* pk = crypto_box_keypair(sk) *)
+fun crypto_box_keypair(sk):pk.
+
+(* c = crypto_box(m,pk,sk) *)
+fun crypto_box(bitstring,pk,sk):bitstring.
+
+(* m = crypto_box_open(c,pk,sk) *)
+fun crypto_box_open(bitstring,pk,sk):bitstring.
+
+equation forall m:bitstring, bobsec:sk, alicesec:sk; crypto_box_open(crypto_box(m,crypto_box_keypair(bobsec),alicesec),crypto_box_keypair(bobsec),alicesec) = m.
+equation forall m:bitstring, bobsec:sk, alicesec:sk; crypto_box_open(crypto_box(m,crypto_box_keypair(bobsec),alicesec),crypto_box_keypair(alicesec),bobsec) = m.
+
+fun commit(bitstring,pk,bitstring):bitstring.
+(* Hash based commitment scheme *)
+
+
+
+(** Protocol A4 **)
+
+type key.
+
+free asecret:bitstring [private].
+free bsecret:bitstring [private].
+
+free c:channel.
+
+let go =
+ new alicesec:sk;
+ new bobsec:sk;
+ let alicepub = crypto_box_keypair(alicesec) in
+ let bobpub = crypto_box_keypair(bobsec) in
+ (
+   (* 1. Alice generates an ephemeral keypair and sends it to Bob (with authenticated encryption) *)
+   new ephsec:sk;
+   let ephpub = crypto_box_keypair(ephsec) in
+   out(c, crypto_box(serialize_pk(ephpub), bobpub, alicesec));
+
+   in(c, (message2a:bitstring,message2b:bitstring));
+   let serialize_pk(bob_ephpub) = crypto_box_open(message2a,bobpub,alicesec) in
+   let message2b_dec = crypto_box_open(message2b,bob_ephpub,ephsec) in
+    
+   (* 3. Alice generates a secret and responds to Bob.eph key with it *)
+   out(c, crypto_box(asecret, bob_ephpub, ephsec));
+
+   in(c, (message4x:bitstring,message4a:bitstring,message4b:bitstring));
+   let message4x_dec = crypto_box_open(message4x,bob_ephpub,ephsec) in
+   let message4a_dec = crypto_box_open(message4a,bob_ephpub,ephsec) in
+   let message4b_dec = crypto_box_open(message4b,bob_ephpub,ephsec) in
+
+   if(message2b_dec = commit(message4a_dec,bob_ephpub,message4b_dec))
+    then 0
+    else 0
+    
+    
+ ) | (
+     new ephsec:sk;
+     let ephpub = crypto_box_keypair(ephsec) in
+     in(c, message1:bitstring);
+     let serialize_pk(alice_ephpub) = crypto_box_open(message1,alicepub,bobsec) in
+     
+   (* 2. Bob generates an ephemeral keypair and a secret and sends it and a commitment of the secret to Alice.eph *)
+     new ephsec:sk;
+     let ephpub = crypto_box_keypair(ephsec) in
+     new commitkey:bitstring;
+     out(c, (crypto_box(serialize_pk(ephpub), bobpub, alicesec)
+            ,crypto_box(commit(bsecret,ephpub,commitkey), alice_ephpub, ephsec)));
+
+     in(c, message3:bitstring);
+     let message3_dec = crypto_box_open(message3,alice_ephpub,ephsec) in
+
+   (* 4. Bob sends a reveal to Alice *)
+     out(c, (crypto_box(message3_dec, alice_ephpub, ephsec) (* extra token to prove commitment is sound -- idea did not work *)
+            ,crypto_box(bsecret, alice_ephpub, ephsec)
+            ,crypto_box(commitkey, alice_ephpub, ephsec)
+            ))
+
+ ).
+
+query attacker(asecret).
+
+(*
+-- Query not attacker(asecret[])
+Completing...
+Starting query not attacker(asecret[])
+RESULT not attacker(asecret[]) is true.
+*)
+
+process
+  !go
+
