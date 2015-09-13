@@ -26,5 +26,8 @@ Alice >> Bob : Send Bob.eph her key material;
 Bob >> Alice : Send Alice.eph the reveal of his key material;
 |||;
 
+Alice box Alice : Verify Bobs key material against the commitment;
+|||;
+
 Bob box Bob : Compute shared secret and erase ephemeral keys,
 Alice box Alice : Compute shared secret and erase ephemeral keys;
