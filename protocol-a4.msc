@@ -1,0 +1,30 @@
+hscale="2.0";
+
+# Solid lines are from public key to public key
+# Dotted lines are from ephemeral key to ephemeral key
+
+Alice box Alice : Generate ephemeral keypair;
+|||;
+
+Alice => Bob : Send Bob her ephemeral public key;
+|||;
+
+Bob box Bob : Generate ephemeral keypair;
+Bob box Bob : Generate secret key material;
+|||;
+
+Bob => Alice : Send Alice his ephemeral public key;
+Bob >> Alice : and send Alice.eph a commitment to his key material;
+|||;
+
+Alice box Alice : Generate secret key material;
+|||;
+
+Alice >> Bob : Send Bob.eph her key material;
+|||;
+
+Bob >> Alice : Send Alice.eph the reveal of his key material;
+|||;
+
+Bob box Bob : Compute shared secret and erase ephemeral keys,
+Alice box Alice : Compute shared secret and erase ephemeral keys;
